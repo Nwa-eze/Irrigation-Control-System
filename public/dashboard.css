@@ -1,0 +1,419 @@
+/* ============================
+   RESET & GLOBAL
+   ============================ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #f4f6f8;
+  color: #333;
+  line-height: 1.5;
+}
+
+/* ============================
+   TOP NAVIGATION BAR
+   ============================ */
+/* Ensure the .top-nav retains its layout */
+.top-nav {
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  justify-content: space-between;
+  padding: 0 1rem; /* Add padding for spacing */
+}
+
+/* Center-align the navigation links */
+.top-nav ul {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  padding: 1rem;
+  margin: 0;
+  list-style: none;
+}
+
+/* Style for nav links */
+.top-nav a {
+  text-decoration: none;
+  font-weight: 600;
+  color: #0074D9;
+  transition: color 0.2s ease;
+}
+.top-nav a:hover,
+.top-nav .nav-link:focus {
+  color: #005bb5;
+}
+
+/* Add spacing for the logout button */
+.nav-right {
+  margin-left: auto;
+}
+
+/* Logout button styles */
+.btn-logout {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.btn-logout:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+}
+
+
+/* ============================
+   SECTION BASE STYLES
+   ============================ */
+.section {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.section h2,
+.section h1 {
+  margin-bottom: 1rem;
+  color: #0074D9;
+}
+
+/* ============================
+   HOME SECTION
+   ============================ */
+.home-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 2rem;
+}
+
+.home-content h1 {
+  font-size: 2em;
+  margin-bottom: 0.5rem;
+}
+
+.home-content p {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: #555;
+}
+
+.balance-display {
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+  font-weight: 600;
+}
+
+.overview-cards {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap; /* allow wrapping on narrow screens */
+}
+
+.overview-cards .card {
+  flex: 1 1 200px;         /* at least 200px wide, but grow equally */
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 1rem;
+  text-align: center;
+}
+
+.overview-cards .card h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  color: #0074D9;          /* accent color */
+}
+
+.overview-cards .card p {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+.promo-text {
+  font-size: 1rem;
+  color: #555;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+/* ============================
+   ANALYTICS SECTION
+   ============================ */
+.analytics-section .chart-card,
+.analytics-section .table-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-section .chart-card {
+  text-align: center;
+}
+
+.analytics-section .table-card {
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.analytics-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.analytics-section th,
+.analytics-section td {
+  padding: 0.75rem;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+.analytics-section th {
+  background-color: #0074D9;
+  color: #fff;
+  position: sticky;
+  top: 0;
+}
+
+.analytics-meta {
+  text-align: center;
+  margin: 0.5rem 0 1rem;
+  font-size: 0.95rem;
+  color: #334155;
+}
+.analytics-meta strong {
+  color: #2563eb;
+}
+
+
+/* ============================
+   PAYMENTS SECTION
+   ============================ */
+.payments-section .prepaid-card,
+.payments-section .postpaid-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+#payment-amount,
+#postpaid-select {
+  width: 100%;
+  max-width: 300px;
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+/* Base button styling */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  margin: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Stripe buttons (blue gradient) */
+.btn-stripe {
+  background: linear-gradient(135deg, #6772e5, #5469d4);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(103,114,229,0.4);
+}
+.btn-stripe:hover {
+  background: linear-gradient(135deg, #5469d4, #4353b3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(103,114,229,0.5);
+}
+
+/* Paystack buttons (green gradient) */
+.btn-paystack {
+  background: linear-gradient(135deg, #29b573, #20a665);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(41,181,115,0.4);
+}
+.btn-paystack:hover {
+  background: linear-gradient(135deg, #20a665, #198556);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(41,181,115,0.5);
+}
+
+/* “Add Credit” button */
+.btn-add {
+  background-color: #28a745;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(40,167,69,0.3);
+}
+.btn-add:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(40,167,69,0.4);
+}
+
+.payment-buttons,
+.postpaid-pay-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.postpaid-balance {
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+/* Divider line between prepaid and postpaid */
+.section-divider {
+  border: none;
+  border-top: 2px solid #e0e0e0;
+  margin: 2rem 0;
+}
+
+
+/* ====== planner-section ====== */
+.planner-section {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: #f9faff;
+  border: 1px solid #e1e8f0;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+.planner-section h2 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+  color: #1e3a8a;
+  text-align: center;
+}
+
+/* ====== planner-form ====== */
+.planner-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-gap: 1rem;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+}
+.form-row.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-row label {
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #334155;
+}
+.form-row input,
+.form-row select {
+  padding: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 1rem;
+  color: #1e293b;
+}
+.form-row input:focus,
+.form-row select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+
+/* ====== button ====== */
+.btn-primary {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  text-align: center;
+}
+.btn-primary:hover {
+  background: #1e40af;
+}
+
+/* ====== result panel ====== */
+.planner-result {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+.planner-result p {
+  margin: 0.5rem 0;
+  color: #1e293b;
+}
+.planner-result small {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+
+/* ============================
+   RESPONSIVE
+   ============================ */
+@media (max-width: 768px) {
+  .overview-cards {
+    flex-direction: column;
+  }
+  .payment-buttons,
+  .postpaid-pay-buttons {
+    flex-direction: column;
+  }
+}
+
+
+
+/* 1. Hide all sections by default */
+.section {
+  display: none;
+}
+
+/* 2. Reveal only the one matching the URL hash */
+.section:target {
+  display: block;
+}
+
+/* 3. If no hash is present, default to showing #home-section */
+body:not(:target) #home-section {
+  display: block;
+}

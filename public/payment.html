@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pay with Stripe Checkout</title>
+  <!-- Include Stripe.js -->
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <h2>Stripe Checkout Payment</h2>
+  <!-- A button to trigger Checkout -->
+  <button id="checkout-button">Pay Now</button>
+
+  <script>
+    // Replace with your publishable key
+    const stripe = Stripe("pk_test_51Qo6ArP6Eq8DZLKp1Jloq3I58N1MA1slOXKB8hK7IpgpdljVj33eVuOuc8MIYxdkilkQOtkLZgnR99oIy2W6bFSt00xSCHSgrM");
+
+    document.getElementById("checkout-button").addEventListener("click", async () => {
+      // Call your backend to create a Checkout Session
+      const response = await fetch("/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          // Send any additional data, e.g., user id, amount, water volume etc.
+          amount: 1000 // example amount in cents
+        })
+      });
+      const session = await response.json();
+
+      // Redirect to Stripe Checkout
+      const { error } = await stripe.redirectToCheckout({
+        sessionId: session.id
+      });
+      if (error) {
+        console.error("Stripe Checkout error:", error);
+      }
+    });
+  </script>
+</body>
+</html>

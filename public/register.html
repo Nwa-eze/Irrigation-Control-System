@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Register</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(to right, #00c6ff, #0072ff);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      background: #fff;
+      width: 100%;
+      max-width: 480px;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    h2 {
+      text-align: center;
+      color: #0072ff;
+      margin-bottom: 1.5rem;
+    }
+
+    form input,
+    form select {
+      width: 100%;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    form input:focus,
+    form select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.2);
+    }
+
+    .row {
+      display: flex;
+      gap: 1rem;
+    }
+    .row input {
+      flex: 1;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 0.85rem;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+    .btn-primary:hover {
+      background: #1e40af;
+    }
+
+    .small {
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 1rem;
+      color: #475569;
+    }
+
+    .small a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .error {
+      color: #d9534f;
+      margin-top: 0.5rem;
+      text-align: center;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="register-container" class="container">
+    <h2>Create Your Account</h2>
+    <form id="register-form">
+      <!-- Login credentials -->
+      <input type="text"    id="reg-username"  placeholder="Username" required>
+      <input type="password" id="reg-password"  placeholder="Password" required>
+
+      <!-- Profile information -->
+      <input type="email"   id="reg-email"     placeholder="Email Address" required>
+      <input type="tel"     id="reg-phone"     placeholder="Phone Number" required>
+      <input type="text"    id="reg-fullname"  placeholder="Full Name" required>
+      <input type="date"    id="reg-dob"       placeholder="Date of Birth" required>
+      <select id="reg-gender" required>
+        <option value="">Select Gender</option>
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+        <option value="O">Other</option>
+      </select>
+
+      <!-- Address fields -->
+      <input type="text" id="address1"   placeholder="Address Line 1" required>
+      <input type="text" id="address2"   placeholder="Address Line 2 (optional)">
+      <div class="row">
+        <input type="text" id="city"           placeholder="City" required>
+        <input type="text" id="state_province" placeholder="State/Province" required>
+      </div>
+      <div class="row">
+        <input type="text" id="country"    placeholder="Country" required>
+        <input type="text" id="postal_code" placeholder="Postal Code" required>
+      </div>
+
+      <!-- Farm info (existing) -->
+      <input type="text" id="reg-location" placeholder="Location/Zone" required>
+      <input type="text" id="reg-farmid"   placeholder="Farm ID" required>
+
+      <button type="submit" class="btn-primary">Register</button>
+      <p id="reg-error" class="error" hidden></p>
+      <p class="small">
+        Already have an account? <a href="login.html">Login here</a>
+      </p>
+    </form>
+  </div>
+
+  <script src="register.js"></script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Water Usage Dashboard</title>
+
+  <!-- Link CSS -->
+  <link rel="stylesheet" href="dashboard.css">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Stripe.js CDN -->
+  <script src="https://js.stripe.com/v3/"></script>
+  <!-- Your existing dashboard.js (with the adjustments shown below) -->
+  <script defer src="dashboard.js"></script>
+</head>
+
+<body>
+  <!-- ===== Top Navigation Bar ===== -->
+  <nav class="top-nav">
+    <ul>
+      <li><a href="#home-section" class="nav-link">Overview</a></li>
+      <li><a href="#analytics-section" class="nav-link">Analytics</a></li>
+      <li><a href="#payments-section" class="nav-link">Payments</a></li>
+      <li><a href="#irrigation-planner" class="nav-link">Planner</a></li>
+    </ul>
+    <div class="nav-right">
+    <button id="logout-btn" class="btn-logout">Logout</button>
+    </div>
+  </nav>
+
+  <!-- ===== HOME SECTION ===== -->
+  <section id="home-section" class="section home-section">
+    <div class="home-content">
+      <h1>Welcome, <span id="user-name">Farmer A</span></h1>
+      <p><strong>Location:</strong> <span id="user-location">Farm Zone 1</span></p>
+      <p><strong>Farm ID:</strong> <span id="farm-id">001</span></p>
+      <p class="balance-display">
+        <strong>Available Balance:</strong> <span id="balance-info">0.00</span>
+      </p>
+      <p class="balance-display">
+        <strong>Outstanding Debt:</strong> <span id="home-owed-amount">0.00</span>
+      </p>
+      <hr>
+      <div class="overview-cards">
+        <div class="card">
+          <h2>Total Water Today</h2>
+          <p id="total-water-today">-- L</p>
+        </div>
+        <div class="card">
+          <h2>Total Water This Month</h2>
+          <p id="total-water-month">-- L</p>
+        </div>
+        <div class="card">
+          <h2>Last Payment</h2>
+          <p id="last-payment">--</p>
+        </div>
+      </div>
+      <p class="promo-text">
+        Our cluster‐farming system uses real‐time sensor data and flexible prepaid/postpaid options to keep your irrigation under control. 
+        Manage your water usage, top‐up on the go, and never run dry.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== ANALYTICS SECTION ===== -->
+  <section id="analytics-section" class="section analytics-section">
+    <h2>Analytics & Sensor Data</h2>
+    <div class="chart-card">
+      <canvas id="usageChart"></canvas>
+    </div>
+    
+    <div class="analytics-meta">
+      <p>
+        <strong>Name:</strong> <span id="analytics-name">—</span>
+        &nbsp;|&nbsp;
+        <strong>Farm ID:</strong> <span id="analytics-farm-id">—</span>
+      </p>
+    </div>
+
+    <div class="table-card">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Flow (L/min)</th>
+            <th>Volume (L)</th>
+            <th>Cost (₦)</th>
+          </tr>
+        </thead>
+        <tbody id="data-table">
+          <!-- Rows inserted by displaySensorData(data) -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== PAYMENTS SECTION ===== -->
+  <section id="payments-section" class="section payments-section">
+    <h1>Payments</h1>
+    <hr class="section-divider">
+    <h2>Prepaid Payment</h2>
+    <div class="prepaid-card">
+      <label for="payment-amount" class="input-label">Enter amount (₦):</label>
+      <input type="number" id="payment-amount" placeholder="e.g. 500" />
+
+      <div class="payment-buttons">
+        <button id="stripe-pay-btn" class="btn btn-stripe">Pay with Stripe</button>
+        <button id="paystack-pay-btn" class="btn btn-paystack">Pay with Paystack</button>
+      </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <h2>Postpaid Payment</h2>
+    <div class="postpaid-card">
+      <label for="postpaid-select" class="input-label">Select credit amount:</label>
+      <select id="postpaid-select">
+        <option value="">Select amount</option>
+        <option value="100">₦100</option>
+        <option value="200">₦200</option>
+        <option value="300">₦300</option>
+        <option value="500">₦500</option>
+        <option value="1000">₦1000</option>
+      </select>
+
+      <button id="add-postpaid-btn" class="btn btn-add">Add Credit</button>
+
+      <div class="postpaid-pay-buttons">
+        <button id="stripe-postpaid-btn" class="btn btn-stripe">Settle via Stripe</button>
+        <button id="paystack-postpaid-btn" class="btn btn-paystack">Settle via Paystack</button>
+      </div>
+
+      <p class="postpaid-balance">
+        Outstanding Balance: ₦<span id="owed-amount">0.00</span>
+      </p>
+    </div>
+  </section>
+
+  <section id="irrigation-planner" class="section planner-section">
+    <h2>Irrigation Planner</h2>
+    <form id="planner-form" class="planner-form">
+      <div class="form-row">
+        <label for="crop">Crop</label>
+        <select id="crop" name="crop" required>
+          <option value="">Select crop…</option>
+          <option value="Tomato">Tomato</option>
+          <option value="Maize">Maize</option>
+          <option value="Rice">Rice</option>
+          <option value="Beans">Beans</option>
+          <option value="Cassava">Cassava</option>
+          <option value="Yam">Yam</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="region">Climate Zone</label>
+        <select id="region" name="region" required>
+          <option value="">Select region…</option>
+          <option value="Desert/Arid">Desert/Arid</option>
+          <option value="Semi-arid">Semi-arid</option>
+          <option value="Sub-humid">Sub-humid</option>
+          <option value="Humid">Humid</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="stage">Growth Stage</label>
+        <select id="stage" name="stage" required>
+          <option value="">Select stage…</option>
+          <option value="Initial">Initial</option>
+          <option value="Development">Development</option>
+          <option value="Mid-season">Mid-season</option>
+          <option value="Late-season">Late-season</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="area">Field Area (m²)</label>
+        <input type="number" id="area" name="area" min="1" placeholder="e.g. 500" required>
+      </div>
+
+      <div class="form-row">
+        <label for="pipe-length">Pipe Length (m)</label>
+        <input type="number" id="pipe-length" name="pipeLength" min="0" placeholder="in meters">
+      </div>
+
+      <div class="form-row">
+        <label for="pipe-diameter">Pipe Diameter (in)</label>
+        <input type="number" id="pipe-diameter" name="pipeDiameter" min="0" placeholder="in inches">
+      </div>
+
+      <div class="form-row full-width">
+        <button type="submit" class="btn-primary">Calculate &amp; Pay</button>
+      </div>
+
+      <div id="planner-result" class="planner-result" hidden>
+        <p><strong>Estimated daily volume:</strong> <span id="daily-volume">—</span> L</p>
+        <p><strong>Total target volume:</strong> <span id="total-volume">—</span> L</p>
+        <p><strong>Estimated water cost:</strong> ₦<span id="water-cost">—</span> <small>(deducted from your balance as you irrigate)</small></p>
+        <p><strong>Flat service fee:</strong> ₦<span id="flat-fee">—</span></p>
+        <!-- Pay button injected here -->
+      </div>
+    </form>
+  </section>
+
+</body>
+</html>
