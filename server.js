@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const mysql = require('mysql2/promise'); // Promise-based MySQL client
 const path = require('path');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Stripe dependency
 const axios = require("axios");
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 
