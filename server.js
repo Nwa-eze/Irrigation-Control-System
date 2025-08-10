@@ -31,6 +31,63 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+
+// --- user_plan_days helpers ---
+async function getOrCreatePlanDay(planId, dayDate) {
+  // dayDate : 'YYYY-MM-DD' string
+  const [rows] = await pool.execute(
+    `SELECT id, consumed_liters FROM user_plan_days WHERE plan_id = ? AND day_date = ? LIMIT 1`,
+    [planId, dayDate]
+  );
+  if (rows.length) return rows[0];
+
+  const [ins] = await pool.execute(
+    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters) VALUES (?, ?, 0)`,
+    [planId, dayDate]
+  );
+  const [newRow] = await pool.execute(
+    `SELECT id, consumed_liters FROM user_plan_days WHERE id = ? LIMIT 1`,
+    [ins.insertId]
+  );
+  return newRow[0];
+}
+
+async function addConsumptionToPlanDay(planId, dayDate, deltaLiters) {
+  // ensure positive numeric
+  const delta = Number(deltaLiters) || 0;
+  if (delta <= 0) return;
+
+  // upsert consumed_liters atomically
+  await pool.execute(
+    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters)
+       VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE consumed_liters = consumed_liters + VALUES(consumed_liters)`,
+    [planId, dayDate, delta]
+  );
+
+  // optionally update aggregate in user_plans.consumed_total
+  try {
+    await pool.execute(
+      `UPDATE user_plans SET consumed_total = COALESCE(consumed_total,0) + ? WHERE id = ?`,
+      [delta, planId]
+    );
+  } catch (e) {
+    // not fatal — log and continue
+    console.error('[addConsumptionToPlanDay] failed to update consumed_total:', e);
+  }
+}
+
+async function getConsumedTodayForPlan(planId, dayDate) {
+  const [rows] = await pool.execute(
+    `SELECT consumed_liters FROM user_plan_days WHERE plan_id = ? AND day_date = ? LIMIT 1`,
+    [planId, dayDate]
+  );
+  if (!rows.length) return 0;
+  return Number(rows[0].consumed_liters) || 0;
+}
+
+
+
 // --------------------
 // Registration Endpoint (optional, for new users)
 // --------------------
@@ -173,20 +230,16 @@ app.get("/get_data", async (req, res) => {
 // --------------------
 // Expects a JSON payload with keys "user1", "user2", and "user3"
 // and inserts data for user IDs 1, 2, and 3 respectively.
+// POST /receive_data - store sensor_data and persist per-plan daily deltas
 app.post('/receive_data', async (req, res) => {
-  // 1) Log the raw incoming payload
   console.log("📥 [receive_data] raw body:", JSON.stringify(req.body));
-
-  // 2) Destructure by key
   const { user1, user2, user3 } = req.body || {};
 
-  // 3) Validate presence of all three
   if (!user1 || !user2 || !user3) {
     console.warn("⚠️ [receive_data] missing user1/user2/user3:", req.body);
     return res.status(400).send("❌ Invalid data format");
   }
 
-  // 4) Parse each field and log
   const flow1   = parseFloat(user1.flow   || 0);
   const volume1 = parseFloat(user1.volume || 0);
   const cost1   = parseFloat(user1.cost   || 0);
@@ -202,20 +255,81 @@ app.post('/receive_data', async (req, res) => {
   const cost3   = parseFloat(user3.cost   || 0);
   console.log(`▶️ Parsed user3 → flow:${flow3}, volume:${volume3}, cost:${cost3}`);
 
-  // 5) Insert all three in one go
   try {
+    // Insert sensor_data for all three users (one query)
     await pool.execute(
       `INSERT INTO sensor_data (user_id, flow, volume, cost) VALUES
          (1, ?, ?, ?),
          (2, ?, ?, ?),
          (3, ?, ?, ?)`,
       [
-        flow1,   volume1,   cost1,
-        flow2,   volume2,   cost2,
-        flow3,   volume3,   cost3
+        flow1, volume1, cost1,
+        flow2, volume2, cost2,
+        flow3, volume3, cost3
       ]
     );
     console.log("✅ [receive_data] sensor_data inserted for users 1,2,3");
+
+    // For each user: compute delta (last two readings) and persist to user_plan_days
+    const users = [
+      { id: 1 },
+      { id: 2 },
+      { id: 3 }
+    ];
+
+    for (const u of users) {
+      try {
+        // fetch last two sensor_data rows for this user (most recent first)
+        const [rows] = await pool.execute(
+          `SELECT volume, timestamp FROM sensor_data WHERE user_id = ? ORDER BY timestamp DESC LIMIT 2`,
+          [u.id]
+        );
+        if (!rows || rows.length === 0) continue;
+
+        const currVol = parseFloat(rows[0].volume || 0);
+        const prevVol = rows[1] ? parseFloat(rows[1].volume || 0) : null;
+
+        // compute delta: if we have a previous reading and curr >= prev => delta = curr - prev
+        // if curr < prev => simple rollover handling: treat delta = curr (you can adjust if you know meter rollover offset)
+        let delta = 0;
+        if (prevVol === null) {
+          // no previous reading — cannot compute delta reliably; skip
+          delta = 0;
+        } else if (currVol >= prevVol) {
+          delta = currVol - prevVol;
+        } else {
+          // rollover case
+          delta = currVol;
+          console.log(`[receive_data] rollover detected for user ${u.id}: prev=${prevVol} curr=${currVol} => delta=${delta}`);
+        }
+
+        if (delta > 0) {
+          // find active plan for this user (most recent active)
+          const [[plan]] = await pool.execute(
+            `SELECT id FROM user_plans WHERE user_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1`,
+            [u.id]
+          );
+          if (plan && plan.id) {
+            const today = new Date().toISOString().slice(0,10);
+            await addConsumptionToPlanDay(plan.id, today, delta);
+            // optional: update consumed_total for plan
+            try {
+              await pool.execute(`UPDATE user_plans SET consumed_total = COALESCE(consumed_total,0) + ? WHERE id = ?`, [delta, plan.id]);
+            } catch (e) {
+              console.error('[receive_data] failed to update consumed_total', e);
+            }
+            console.log(`[receive_data] added delta=${delta} L to plan ${plan.id} for user ${u.id} (date ${today})`);
+          } else {
+            // no active plan - nothing to persist for planner
+            // (we keep sensor_data in DB though)
+          }
+        }
+      } catch (innerErr) {
+        console.error(`[receive_data] per-user ledger update failed for user ${u.id}:`, innerErr);
+        // don't fail whole endpoint on a per-user ledger write error
+      }
+    }
+
     return res.send("✅ Data received and stored");
   } catch (err) {
     console.error("❌ [receive_data] DB insert error:", err);
@@ -399,12 +513,13 @@ app.post("/update_balance", async (req, res) => {
 });
 
 
-// GET /valve_states - robust, verbose logging
+
+// GET /valve_states - robust, uses persisted per-day ledger for consumedToday
 app.get('/valve_states', async (req, res) => {
   try {
     const userIds = [1,2,3]; // adjust as needed
 
-    // 1) fetch balances (do not trust initial manual flag here; we'll re-read per-user after potential updates)
+    // 1) fetch balances
     const [rows] = await pool.query(
       `SELECT u.id AS user_id,
               COALESCE(u.available_balance, 0) AS available_balance
@@ -424,35 +539,25 @@ app.get('/valve_states', async (req, res) => {
           LIMIT 1`,
         [userId]
       );
-      if (!plan) {
-        return { allowsOpen: false, reason: 'no_plan' };
-      }
+      if (!plan) return { allowsOpen: false, reason: 'no_plan' };
 
-      // latest meter reading
-      const [[meterRow]] = await pool.execute(
-        `SELECT volume, timestamp FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
-        [userId]
-      );
-      const currVol = parseFloat(meterRow?.volume || 0);
-
-      // use recorded start_volume; if missing, treat startVol as currVol (so pre-plan usage doesn't count)
-      let startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
-                       ? parseFloat(plan.start_volume || 0)
-                       : currVol;
-
-      // handle rollover (currVol < startVol)
-      let consumedToday;
-      if (currVol >= startVol) {
-        consumedToday = currVol - startVol;
-      } else {
-        consumedToday = currVol;
-        try {
-          await pool.execute(`UPDATE user_plans SET start_volume = ? WHERE id = ?`, [currVol, plan.id]);
-          console.log(`[planAllowsOpen] rollover: resynced start_volume for plan ${plan.id} -> ${currVol}`);
-          startVol = currVol;
-        } catch (e) {
-          console.error('[planAllowsOpen] failed to resync start_volume', e);
-        }
+      // get persisted consumedToday from ledger
+      const today = new Date().toISOString().slice(0,10);
+      let consumedToday = 0;
+      try {
+        consumedToday = await getConsumedTodayForPlan(plan.id, today);
+      } catch (e) {
+        console.error('[planAllowsOpen] failed to read consumedToday from ledger, falling back to sensor calc:', e);
+        // fallback: best-effort compute from latest sensor row and start_volume
+        const [[meterRow]] = await pool.execute(
+          `SELECT volume FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
+          [userId]
+        );
+        const currVol = parseFloat(meterRow?.volume || 0);
+        const startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
+                           ? parseFloat(plan.start_volume || 0)
+                           : currVol;
+        consumedToday = Math.max(0, currVol - startVol);
       }
 
       const perDay = parseFloat(plan.per_day_target || 0);
@@ -462,25 +567,25 @@ app.get('/valve_states', async (req, res) => {
       const hitToday = perDay > 0 && consumedToday >= perDay;
       const exceedDays = duration > 0 && daysElapsed >= duration;
 
-      console.log(`[planAllowsOpen] user=${userId} planId=${plan.id} currVol=${currVol} startVol=${startVol} consumedToday=${consumedToday} perDay=${perDay} daysElapsed=${daysElapsed} duration=${duration}`);
+      console.log(`[planAllowsOpen] user=${userId} planId=${plan.id} consumedToday=${consumedToday} perDay=${perDay} daysElapsed=${daysElapsed} duration=${duration}`);
 
       if (exceedDays || hitToday) {
         const reason = exceedDays ? 'duration_complete' : 'daily_limit';
         // mark plan completed
         try {
-          const [r] = await pool.execute(
+          await pool.execute(
             `UPDATE user_plans SET status='completed', completed_at = NOW() WHERE id = ? AND status = 'active'`,
             [plan.id]
           );
-          console.log(`[planAllowsOpen] marked plan ${plan.id} completed (user ${userId}) result:`, r);
+          console.log(`[planAllowsOpen] marked plan ${plan.id} completed (user ${userId})`);
         } catch (e) {
           console.error('[planAllowsOpen] failed to mark plan completed', e);
         }
 
-        // clear manual open flag (so MCU will receive closed on next poll)
+        // clear manual open flag so MCU receives closed on next poll
         try {
-          const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [userId]);
-          console.log(`[planAllowsOpen] cleared valve_state.is_open for user ${userId} result:`, u);
+          await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [userId]);
+          console.log(`[planAllowsOpen] cleared valve_state.is_open for user ${userId}`);
         } catch (e) {
           console.error('[planAllowsOpen] failed to clear valve_state.is_open', e);
         }
@@ -497,11 +602,11 @@ app.get('/valve_states', async (req, res) => {
       const uid = r.user_id;
       const balance = parseFloat(r.available_balance || 0);
 
-      // If balance <= 0 => must close. Clear manual flag.
+      // 1) balance zero -> closed, clear manual flag
       if (balance <= 0) {
         try {
-          const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
-          console.log(`[valve_states] balance<=0: cleared manual flag for user ${uid}`, u);
+          await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
+          console.log(`[valve_states] user ${uid} balance<=0: cleared manual flag`);
         } catch (e) {
           console.error(`[valve_states] failed clearing manual for user ${uid}`, e);
         }
@@ -514,7 +619,7 @@ app.get('/valve_states', async (req, res) => {
         continue;
       }
 
-      // Run plan logic (may mark completed and clear manual flag)
+      // 2) run plan logic (may mark completed & clear manual flag)
       let planInfo;
       try {
         planInfo = await planAllowsOpen(uid);
@@ -523,12 +628,12 @@ app.get('/valve_states', async (req, res) => {
         planInfo = { allowsOpen: false, reason: 'plan_check_error' };
       }
 
-      // Re-read the manual flag now (after planAllowsOpen possibly updated DB)
+      // re-read manual flag after plan check (in case planAllowsOpen cleared it)
       const [[vrow]] = await pool.execute(`SELECT is_open FROM valve_state WHERE user_id = ? LIMIT 1`, [uid]);
       const manualOpenNow = !!vrow?.is_open;
       console.log(`[valve_states] user ${uid} manualOpenNow:`, manualOpenNow);
 
-      // If plan exists (planInfo.reason !== 'no_plan') => follow plan result.
+      // If an active plan was found, follow plan decision
       if (planInfo && planInfo.reason !== 'no_plan') {
         if (planInfo.allowsOpen) {
           result[`user${uid}_state`] = true;
@@ -537,8 +642,8 @@ app.get('/valve_states', async (req, res) => {
           // plan blocks open -> ensure DB manual flag cleared
           if (manualOpenNow) {
             try {
-              const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
-              console.log(`[valve_states] plan blocked -> cleared manual for ${uid}`, u);
+              await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
+              console.log(`[valve_states] plan blocked -> cleared manual for ${uid}`);
             } catch (e) {
               console.error(`[valve_states] failed clear manual (plan blocked) for ${uid}`, e);
             }
@@ -555,7 +660,7 @@ app.get('/valve_states', async (req, res) => {
         continue;
       }
 
-      // No active plan: honor manual flag (since balance > 0)
+      // 3) no active plan: honor manual flag (since balance > 0)
       if (manualOpenNow) {
         result[`user${uid}_state`] = true;
         result[`user${uid}_reason`] = 'manual_override';
@@ -576,6 +681,7 @@ app.get('/valve_states', async (req, res) => {
     return res.status(500).json({ error: 'DB error' });
   }
 });
+
 
 
 
@@ -753,6 +859,21 @@ app.post('/api/plans/start', async (req, res) => {
         `SELECT available_balance FROM users WHERE id = ?`,
         [userId]
       );
+      
+      try {
+        const today = new Date().toISOString().slice(0,10);
+        // ensure the plan-day row exists (0 consumed so far) — uses consumed_liters column
+        await pool.execute(
+         `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters)
+            VALUES (?, ?, 0)
+          ON DUPLICATE KEY UPDATE consumed_liters = consumed_liters`,
+          [planId, todayDateString]
+        );
+
+      } catch (errInsertDay) {
+        console.error('Warning: could not create initial user_plan_days row:', errInsertDay);
+        // non-fatal: plan has been created, continue
+      }
 
       res.json({
         planId:       insPlan.insertId,
@@ -862,8 +983,17 @@ app.get('/api/device/state', async (req, res) => {
                        ? parseFloat(plan.start_volume || 0)
                        : currVol;
 
-    let consumedToday = currVol - startVol;
-    if (consumedToday < 0) consumedToday = 0; // guard against rollovers
+    const dayDate = todayString();
+    let consumedToday = 0;
+    try {
+      consumedToday = plan ? await getConsumedTodayForPlan(plan.id, dayDate) : 0;
+      if (!Number.isFinite(consumedToday)) consumedToday = 0;
+    } catch (errGet) {
+      console.error('Failed to read consumedToday from user_plan_days:', errGet);
+      // fallback to legacy calc (best-effort)
+      consumedToday = currVol - startVol;
+      if (consumedToday < 0) consumedToday = 0;
+    }
 
     const perDayTarget = Number(parseFloat(plan.per_day_target) || 0);
     const remainingToday = Math.max(0, perDayTarget - consumedToday);
