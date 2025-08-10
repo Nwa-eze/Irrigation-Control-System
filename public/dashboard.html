@@ -20,15 +20,16 @@
   <!-- ===== Top Navigation Bar ===== -->
   <nav class="top-nav">
     <ul>
-      <li><a href="#home-section" class="nav-link">Overview</a></li>
-      <li><a href="#analytics-section" class="nav-link">Analytics</a></li>
-      <li><a href="#payments-section" class="nav-link">Payments</a></li>
-      <li><a href="#irrigation-planner" class="nav-link">Planner</a></li>
+      <li><a href="#home-section"    class="nav-link" data-target="home-section">Overview</a></li>
+      <li><a href="#analytics-section" class="nav-link" data-target="analytics-section">Analytics</a></li>
+      <li><a href="#payments-section"  class="nav-link" data-target="payments-section">Payments</a></li>
+      <li><a href="#irrigation-planner" class="nav-link" data-target="irrigation-planner">Planner</a></li>
     </ul>
     <div class="nav-right">
-    <button id="logout-btn" class="btn-logout">Logout</button>
+      <button id="logout-btn" class="btn-logout">Logout</button>
     </div>
   </nav>
+
 
   <!-- ===== HOME SECTION ===== -->
   <section id="home-section" class="section home-section">
@@ -143,15 +144,38 @@
     <form id="planner-form" class="planner-form">
       <div class="form-row">
         <label for="crop">Crop</label>
-        <select id="crop" name="crop" required>
+        <input
+          type="text"
+          id="crop"
+          name="crop"
+          list="crop-list"
+          placeholder="Type or select crop…"
+          required
+          class="datalist-input"
+        />
+        <datalist id="crop-list">
           <option value="">Select crop…</option>
-          <option value="Tomato">Tomato</option>
-          <option value="Maize">Maize</option>
-          <option value="Rice">Rice</option>
-          <option value="Beans">Beans</option>
-          <option value="Cassava">Cassava</option>
-          <option value="Yam">Yam</option>
-        </select>
+          <option value="Banana Year 1">Banana Year 1</option>
+          <option value="Banana Year 2">Banana Year 2</option>
+          <option value="Barley/Oats/Wheat">Barley/Oats/Wheat</option>
+          <option value="Dry Beans">Dry Beans</option>
+          <option value="Green Beans">Green Beans</option>
+          <option value="Broccoli">Broccoli</option>
+          <option value="Cabbage">Cabbage</option>
+          <option value="Carrots">Carrots</option>
+          <option value="Cassava Year 1">Cassava Year 1</option>
+          <option value="Cassava Year 2">Cassava Year 2</option>
+          <option value="Celery">Celery</option>
+          <option value="Citrus">Citrus</option>
+          <option value="Cotton">Cotton</option>
+           <option value="Cowpea">Cowpea</option>
+          <option value="Cucumber">Cucumber</option>
+          <option value="Faba Bean">Faba Bean</option>
+          <option value="Grains(small)">Grains(small)</option>
+          <option value="Grapes">Grapes</option>
+          <option value="Test">Test</option>
+
+        </datalist>
       </div>
 
       <div class="form-row">
@@ -163,6 +187,40 @@
           <option value="Sub-humid">Sub-humid</option>
           <option value="Humid">Humid</option>
         </select>
+
+        <details class="zone-legend" style="margin-top:1em;">
+          <summary>Zone Legend &amp; Example Cities</summary>
+          <table>
+            <thead>
+              <tr><th>City</th><th>Country</th><th>Zone</th></tr>
+            </thead>
+            <tbody>
+              <!-- Nigeria examples -->
+              <tr><td><strong>Lagos</strong></td><td>Nigeria</td><td>Humid</td></tr>
+              <tr><td>Port Harcourt</td><td>Nigeria</td><td>Humid</td></tr>
+              <tr><td>Calabar</td><td>Nigeria</td><td>Humid</td></tr>
+              <tr><td>Benin City</td><td>Nigeria</td><td>Humid</td></tr>
+              <tr><td>Ibadan</td><td>Nigeria</td><td>Sub-humid</td></tr>
+              <tr><td>Abuja</td><td>Nigeria</td><td>Sub-humid</td></tr>
+              <tr><td>Kaduna</td><td>Nigeria</td><td>Sub-humid</td></tr>
+              <tr><td>Kano</td><td>Nigeria</td><td>Semi-arid</td></tr>
+              <tr><td>Maiduguri</td><td>Nigeria</td><td>Arid</td></tr>
+              <tr><td>Sokoto</td><td>Nigeria</td><td>Arid</td></tr>
+              <!-- Global examples -->
+              <tr><td>Cairo</td><td>Egypt</td><td>Arid</td></tr>
+              <tr><td>Phoenix</td><td>USA</td><td>Arid</td></tr>
+              <tr><td>Dubai</td><td>UAE</td><td>Arid</td></tr>
+              <tr><td>Casablanca</td><td>Morocco</td><td>Semi-arid</td></tr>
+              <tr><td>Madrid</td><td>Spain</td><td>Sub-humid</td></tr>
+              <tr><td>Rome</td><td>Italy</td><td>Sub-humid</td></tr>
+              <tr><td>London</td><td>UK</td><td>Humid</td></tr>
+              <tr><td>Paris</td><td>France</td><td>Humid</td></tr>
+              <tr><td>New York City</td><td>USA</td><td>Humid</td></tr>
+              <tr><td>Mumbai</td><td>India</td><td>Sub-humid</td></tr>
+              <tr><td>Bangkok</td><td>Thailand</td><td>Humid</td></tr>
+            </tbody>
+          </table>
+        </details>
       </div>
 
       <div class="form-row">
@@ -202,8 +260,25 @@
         <p><strong>Flat service fee:</strong> ₦<span id="flat-fee">—</span></p>
         <!-- Pay button injected here -->
       </div>
+
+      <div id="plan-summary" class="plan-summary" hidden>
+        <p><strong>Duration:</strong> <span id="plan-duration-days">—</span> day(s)</p>
+        <p><strong>Days elapsed:</strong> <span id="plan-days-elapsed">—</span></p>
+        <p><strong>Days left:</strong> <span id="plan-days-left">—</span></p>
+        <p><strong>Consumed today:</strong> <span id="plan-consumed-today">—</span> L</p>
+        <p><strong>Remaining today:</strong> <span id="plan-remaining-today">—</span> L</p>
+        <p><strong>Plan end date:</strong> <span id="plan-end-date">—</span></p>
+
+        <div id="plan-actions" class="plan-actions">
+          <button id="btn-manual-open" class="btn-action btn-open" onclick="handleManualOpen()">Reopen Valve</button>
+          <button id="btn-cancel-plan" class="btn-action btn-cancel" onclick="handleCancelPlan()">Cancel Plan</button>
+          <button id="btn-manual-close" class="btn-action btn-close" onclick="handleManualClose()">Close Valve</button>
+
+          <div id="valve-indicator" class="valve-indicator">
+            Valve: <span id="valve-status" class="valve-status">—</span>
+          </div>
+        </div>
     </form>
   </section>
-
 </body>
 </html>

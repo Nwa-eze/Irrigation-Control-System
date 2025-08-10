@@ -27,7 +27,7 @@ document.getElementById('register-form').addEventListener('submit', async e => {
   };
 
   try {
-    const resp = await fetch('http://localhost:3005/register', {
+    const resp = await fetch('http://10.218.220.142:3005/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

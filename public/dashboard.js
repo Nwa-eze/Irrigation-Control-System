@@ -8,40 +8,6 @@ const processedVolumeTimestamps = new Set();
 const PAYSTACK_BASE_URL   = 'https://api.paystack.co';
 
 
-// On load, check if there's an active plan that hasn't expired
-const savedPlan = localStorage.getItem('active_plan');
-if (savedPlan) {
-  const plan = JSON.parse(savedPlan);
-  const now = Date.now();
-  if (now < plan.expires) {
-    const plannerResult = document.getElementById('planner-result');
-    if (plannerResult) {
-      plannerResult.hidden = false;
-
-      // Fill in the saved values
-      document.getElementById('daily-volume').textContent = plan.dailyVolume;
-      document.getElementById('total-volume').textContent = plan.totalTarget;
-      document.getElementById('flat-fee').textContent    = plan.flatFee;
-      document.getElementById('water-cost').textContent  =
-        (parseFloat(plan.dailyVolume) * plan.durationDays * 5).toFixed(2);
-
-      // Also add the duration line if needed
-      let p = document.getElementById('plan-duration');
-      if (!p) {
-        p = document.createElement('p');
-        p.id = 'plan-duration';
-        plannerResult.insertBefore(p, plannerResult.firstChild);
-      }
-      p.innerHTML = `<strong>Duration:</strong> ${plan.durationDays} day(s)`;
-    }
-  } else {
-    // Plan expired — clean up
-    localStorage.removeItem('active_plan');
-  }
-}
-
-
-
 // ------------------------
 // 1) SENSOR DATA / CHART
 // ------------------------
@@ -54,7 +20,7 @@ async function loadSensorData() {
   }
 
   try {
-    const response = await fetch(`http://10.151.85.142:3005/get_data?user_id=${userId}`, {
+    const response = await fetch(`http://10.218.220.142:3005/get_data?user_id=${userId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -234,7 +200,6 @@ function updateAnalyticsInfo() {
 }
 
 
-
 // -------------------------------------------------
 // 2) PREPAID PAYMENT (Stripe & Paystack, NO PRE-CREDIT)
 // -------------------------------------------------
@@ -253,7 +218,7 @@ async function startStripePayment() {
   }
 
   try {
-    const resp = await fetch("http://10.151.85.142:3005/create-checkout-session", {
+    const resp = await fetch("http://10.218.220.142:3005/create-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -289,7 +254,7 @@ async function startPaystackPayment() {
   }
 
   try {
-    const resp = await fetch("http://10.151.85.142:3005/paystack/initialize", {
+    const resp = await fetch("http://10.218.220.142:3005/paystack/initialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -427,7 +392,7 @@ function updateBalanceInfo() {
 
 async function updateBalanceInBackend(userId, balance) {
   try {
-    const response = await fetch("http://10.151.85.142:3005/update_balance", {
+    const response = await fetch("http://10.218.220.142:3005/update_balance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, available_balance: balance })
@@ -505,7 +470,7 @@ async function startPostpaidPayment() {
   }
 
   try {
-    const response = await fetch("http://10.151.85.142:3005/create-postpaid-session", {
+    const response = await fetch("http://10.218.220.142:3005/create-postpaid-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: owedAmount, userId, type: "postpaid" })
@@ -533,7 +498,7 @@ async function startPostpaidPaymentPaystack() {
   }
 
   try {
-    const resp = await fetch("http://10.151.85.142:3005/api/paystack/initialize", {
+    const resp = await fetch("http://10.218.220.142:3005/api/paystack/initialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -604,12 +569,58 @@ function showOnlySection(targetId) {
       if (sec) sec.style.display = (id === targetId) ? "block" : "none";
     });
 }
+// (2) Highlight & tab-switcher logic
+document.querySelectorAll('.top-nav .nav-link').forEach(link => {
+  const targetId = link.dataset.target;
+
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    showOnlySection(targetId);
+    document.querySelectorAll('.top-nav .nav-link').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+  });
+
+  if (window.location.hash === `#${targetId}`) {
+    link.classList.add('active');
+    showOnlySection(targetId);
+  }
+});
+
+if (!window.location.hash) {
+  const first = document.querySelector('.top-nav .nav-link');
+  first.classList.add('active');
+  showOnlySection(first.dataset.target);
+}
+
 
 // ---------------------------------------------------
 // 10) ONCE HTML IS PARSED, ATTACH ALL EVENT LISTENERS
 // ---------------------------------------------------
-document.addEventListener("DOMContentLoaded", () => {
-  // (a) Top‑nav links
+// ------------------- Page init (replace existing DOMContentLoaded block) -------------------
+document.addEventListener('DOMContentLoaded', async () => {
+  // read userId once
+  const userId = localStorage.getItem('user_id');
+  console.log('🟢 DOMContentLoaded — user_id:', userId);
+
+  // ---------- Safe helpers ----------
+  const safe = {
+    el: id => document.getElementById(id),
+    on: (id, evt, fn) => { const el = document.getElementById(id); if (el) el.addEventListener(evt, fn); },
+    logFetch: async (label, p) => {
+      try {
+        const resp = await p;
+        console.log(`${label} → status:`, resp.status);
+        const json = await resp.json().catch(()=>null);
+        console.log(`${label} → body:`, json);
+        return { resp, json };
+      } catch (err) {
+        console.error(`${label} → error:`, err);
+        return { resp: null, json: null, err };
+      }
+    }
+  };
+
+  // ---------- Top nav ----------
   document.querySelectorAll(".top-nav .nav-link").forEach(a => {
     a.addEventListener("click", evt => {
       evt.preventDefault();
@@ -618,183 +629,533 @@ document.addEventListener("DOMContentLoaded", () => {
       showOnlySection(href);
     });
   });
-  document.getElementById("logout-btn").addEventListener("click", logout);
+  safe.on('logout-btn','click', logout);
 
-  // (b) On first load, show either hash or default “home-section”
+  // ---------- Default section ----------
   const initialHash = window.location.hash.substring(1);
-  if (["home-section", "analytics-section", "payments-section", "irrigation-planner"].includes(initialHash)) {
+  if (["home-section","analytics-section","payments-section","irrigation-planner"].includes(initialHash)) {
     showOnlySection(initialHash);
   } else {
     window.location.hash = "home-section";
     showOnlySection("home-section");
   }
 
-  // (c) Attach prepaid buttons
-  document.getElementById("stripe-pay-btn")?.addEventListener("click", startStripePayment);
-  document.getElementById("paystack-pay-btn")?.addEventListener("click", startPaystackPayment);
+  // ---------- Attach payment & postpaid buttons (if present) ----------
+  safe.on('stripe-pay-btn','click', startStripePayment);
+  safe.on('paystack-pay-btn','click', startPaystackPayment);
+  safe.on('add-postpaid-btn','click', handleAddPostpaid);
+  safe.on('stripe-postpaid-btn','click', startPostpaidPayment);
+  safe.on('paystack-postpaid-btn','click', startPostpaidPaymentPaystack);
 
-  // (d) Attach postpaid buttons
-  document.getElementById("add-postpaid-btn")?.addEventListener("click", handleAddPostpaid);
-  document.getElementById("stripe-postpaid-btn")?.addEventListener("click", startPostpaidPayment);
-  document.getElementById("paystack-postpaid-btn")?.addEventListener("click", startPostpaidPaymentPaystack);
+  // ---------- Call site-wide updaters but don't crash if they don't exist ----------
+  try { if (typeof updateHomeInfo === 'function') await updateHomeInfo(userId); } catch (e) { console.warn('updateHomeInfo failed', e); }
+  try { if (typeof updateBalanceInfo === 'function') await updateBalanceInfo(userId); } catch (e) { console.warn('updateBalanceInfo failed', e); }
+  try { if (typeof updatePostpaidOwed === 'function') await updatePostpaidOwed(userId); } catch (e) { console.warn('updatePostpaidOwed failed', e); }
+  try { if (typeof updateLastPaymentDisplay === 'function') await updateLastPaymentDisplay(userId); } catch (e) { console.warn('updateLastPaymentDisplay failed', e); }
+  try { if (typeof updateAnalyticsInfo === 'function') await updateAnalyticsInfo(userId); } catch (e) { console.warn('updateAnalyticsInfo failed', e); }
 
-  // (e) Initialize Home info, balance, owed
-  updateHomeInfo();
-  updateBalanceInfo();
-  updatePostpaidOwed();
-  updateLastPaymentDisplay();
-  updateAnalyticsInfo();
+  // ---------- Planner UI refs ----------
+  const cropSelect   = safe.el('crop');
+  const regionSelect = safe.el('region');
+  const stageSelect  = safe.el('stage');
+  const plannerForm  = safe.el('planner-form');
+  const plannerResult = safe.el('planner-result');
+  let currentCalc = null;
 
-  
-  // ─── IRRIGATION PLANNER ─────────────────────────
-  const plannerForm   = document.getElementById('planner-form');
-  const plannerResult = document.getElementById('planner-result');
-  let currentCalc     = null;
-
-  if (plannerForm) {
-    console.log("🛠️ [Planner] Listener attaching");
-    plannerForm.addEventListener('submit', async e => {
-      e.preventDefault();
-      console.log("🛠️ [Planner] Submit event fired");
-
-      const userId = localStorage.getItem('user_id');
-      console.log("🛠️ [Planner] userId =", userId);
-      const payload = {
-        userId,
-        crop:   plannerForm.crop.value,
-        region: plannerForm.region.value,
-        stage:  plannerForm.stage.value,
-        area:   parseFloat(plannerForm.area.value)
-      };
-      console.log("📤 [Planner] Calculate payload:", payload);
-
-      let resp, data;
-      try {
-        resp = await fetch('http://10.151.85.142:3005/api/plans/calculate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        console.log("⬅️ [Planner] HTTP status:", resp.status);
-        data = await resp.json();
-        console.log("⬅️ [Planner] Calculate response:", data);
-      } catch (err) {
-        console.error("❌ [Planner] Fetch error:", err);
-        return alert("Network error during calculation. See console.");
-      }
-
-      if (!resp.ok) {
-        console.warn("⚠️ [Planner] Calculation failed:", data.error);
-        return alert(data.error || 'Calculation failed.');
-      }
-
-      // store for start step
-      currentCalc = {
-        ...payload,
-        dailyVolume: data.dailyVolume,
-        totalTarget: data.totalTarget,
-        durationDays: data.durationDays,
-        flatFee: data.flatFee
-      };
-      console.log("🛠️ [Planner] currentCalc set to:", currentCalc);
-
-      // populate result panel
-      document.getElementById('daily-volume').textContent = data.dailyVolume;
-      document.getElementById('total-volume').textContent = data.totalTarget;
-      document.getElementById('water-cost').textContent   =
-        (parseFloat(data.dailyVolume) * data.durationDays * 5).toFixed(2);
-      document.getElementById('flat-fee').textContent    = data.flatFee;
-
-      // show duration
-      let p = document.getElementById('plan-duration');
-      if (!p) {
-        p = document.createElement('p');
-        p.id = 'plan-duration';
-        plannerResult.insertBefore(p, plannerResult.firstChild);
-      }
-      p.innerHTML = `<strong>Duration:</strong> ${data.durationDays} day(s)`;
-
-      // reveal panel & inject “Pay & Start” button
-      plannerResult.hidden = false;
-      let startBtn = document.getElementById('btn-start-plan');
-      if (!startBtn) {
-        startBtn = document.createElement('button');
-        startBtn.id = 'btn-start-plan';
-        startBtn.className = 'btn-primary';
-        startBtn.textContent = 'Pay & Start';
-        plannerResult.appendChild(startBtn);
-        startBtn.addEventListener('click', startPlan);
-      }
-    });
+  // helper: safe-reset dropdown
+  function reset(selectEl, placeholder) {
+    if (!selectEl) return;
+    selectEl.innerHTML = `<option value="">${placeholder}</option>`;
   }
 
-  // (f) “Pay & Start” handler
+  // dynamic regions when crop changes (guard against missing elements)
+  if (cropSelect && regionSelect && stageSelect) {
+    cropSelect.addEventListener('change', async () => {
+      const crop = cropSelect.value;
+      reset(regionSelect, 'Select region…');
+      reset(stageSelect,  'Select stage…');
+      if (!crop) return;
+      regionSelect.innerHTML += `<option>Loading…</option>`;
+      try {
+        const r = await fetch(`/api/plans/regions?crop=${encodeURIComponent(crop)}`, { cache: 'no-store' });
+        const regions = await r.json();
+        reset(regionSelect, 'Select region…');
+        (regions || []).forEach(x => {
+          const o = document.createElement('option'); o.value = x; o.textContent = x; regionSelect.appendChild(o);
+        });
+      } catch (err) {
+        console.error('Failed to load regions', err);
+        reset(regionSelect, 'Error loading');
+      }
+    });
+
+    regionSelect.addEventListener('change', async () => {
+      const crop = cropSelect.value;
+      const region = regionSelect.value;
+      reset(stageSelect, 'Select stage…');
+      if (!crop || !region) return;
+      stageSelect.innerHTML += `<option>Loading…</option>`;
+      try {
+        const r = await fetch(`/api/plans/stages?crop=${encodeURIComponent(crop)}&region=${encodeURIComponent(region)}`, { cache: 'no-store' });
+        const stages = await r.json();
+        reset(stageSelect, 'Select stage…');
+        (stages || []).forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; stageSelect.appendChild(o); });
+      } catch (err) {
+        console.error('Failed to load stages', err);
+        reset(stageSelect, 'Error loading');
+      }
+    });
+  } else {
+    console.warn('Planner selects missing: crop/region/stage', { cropSelect, regionSelect, stageSelect });
+  }
+
+  // planner form submit
+  if (plannerForm) {
+    plannerForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const uid = localStorage.getItem('user_id');
+      const payload = {
+        userId: uid,
+        crop:   plannerForm.crop?.value || '',
+        region: plannerForm.region?.value || '',
+        stage:  plannerForm.stage?.value || '',
+        area:   parseFloat(plannerForm.area?.value || 0)
+      };
+      console.log('📤 [Planner] Calculate payload:', payload);
+      try {
+        const resp = await fetch('/api/plans/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify(payload),
+          cache: 'no-store'
+        });
+        const data = await resp.json();
+        console.log('⬅️ [Planner] calculate response:', resp.status, data);
+        if (!resp.ok) return alert(data.error || 'Calculation failed.');
+        currentCalc = { ...payload, ...data };
+
+        safe.el('daily-volume') && (safe.el('daily-volume').textContent = data.dailyVolume);
+        safe.el('total-volume') && (safe.el('total-volume').textContent = data.totalTarget);
+        if (safe.el('water-cost')) safe.el('water-cost').textContent = ((parseFloat(data.totalTarget)||0) * 5).toFixed(2);
+        safe.el('flat-fee') && (safe.el('flat-fee').textContent = data.flatFee);
+
+        let p = safe.el('plan-duration');
+        if (!p && plannerResult) {
+          p = document.createElement('p'); p.id = 'plan-duration'; plannerResult.insertBefore(p, plannerResult.firstChild);
+        }
+        if (p) p.innerHTML = `<strong>Duration:</strong> ${data.durationDays} day(s)`;
+
+        if (plannerResult) plannerResult.hidden = false;
+        if (!safe.el('btn-start-plan')) {
+          const btn = document.createElement('button');
+          btn.id = 'btn-start-plan'; btn.className = 'btn-primary'; btn.textContent = 'Pay & Start';
+          btn.addEventListener('click', startPlan);
+          plannerResult.appendChild(btn);
+        }
+      } catch (err) {
+        console.error('[Planner] Calculate error', err);
+        alert('Network or server error during calculation.');
+      }
+    });
+  } else {
+    console.warn('planner-form element not found');
+  }
+
+  // ---------- Planner + Plan lifecycle (updated) ----------
+/* Assumes:
+   - safe.el(id) -> document.getElementById(id) helper exists
+   - API endpoints:
+     POST /api/plans/start   (body { userId, crop, region, stage, area })
+     GET  /api/plans/active  (?userId=...)
+     POST /api/valve/open    (body { userId })
+     POST /api/plans/cancel  (body { userId })  <-- see note below
+*/
+
+
+  // --- START PLAN ---
   async function startPlan() {
     console.log('▶️ startPlan invoked, currentCalc =', currentCalc);
     if (!currentCalc) return alert('Please calculate first.');
 
-    const { userId, crop, region, stage, area } = currentCalc;
-    console.log('▶️ startPlan payload:', { userId, crop, region, stage, area });
+    const { crop, region, stage, area } = currentCalc;
+    if (!userId) return alert('User not logged in.');
 
-    let resp, data;
     try {
-      resp = await fetch('http://10.151.85.142:3005/api/plans/start', {
+      const resp = await fetch('/api/plans/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, crop, region, stage, area })
+        body: JSON.stringify({ userId, crop, region, stage, area }),
+        cache: 'no-store'
       });
-      console.log('⬅️ startPlan status:', resp.status);
-      data = await resp.json();
-      console.log('⬅️ startPlan response:', data);
+
+      // defensive parse
+      const data = await resp.json().catch(() => null);
+      console.log('⬅️ startPlan response:', resp.status, data);
+
+      if (!resp.ok) return alert(data?.error || 'Could not start plan.');
+
+      if (typeof data.newBalance !== 'undefined') {
+        // store as string — preserve decimals if backend returned them
+        localStorage.setItem('available_balance_' + userId, String(data.newBalance));
+        if (typeof updateBalanceInfo === 'function') updateBalanceInfo(userId);
+      }
+
+      showPlanSummary({
+        planId: data.planId,
+        dailyTarget: Number(data.dailyVolume || data.dailyTarget || 0),
+        totalTarget: Number(data.totalTarget || 0),
+        duration: parseInt(data.durationDays || data.duration || 0, 10)
+      });
+
+      const startBtn = safe.el('btn-start-plan');
+      if (startBtn) { startBtn.disabled = true; startBtn.style.display = 'none'; }
+
+      alert(`Plan started! Target ${data.totalTarget} L over ${data.durationDays} day(s).`);
+
+      // start polling
+      startPollingDeviceState(userId, 10000);
     } catch (err) {
-      console.error('❌ startPlan fetch error:', err);
-      return alert('Network error when starting plan.');
+      console.error('startPlan error', err);
+      alert('Network error when starting plan.');
     }
-
-    if (!resp.ok) {
-      console.warn('⚠️ startPlan server error:', data.error);
-      return alert(data.error || 'Could not start plan.');
-    }
-
-    // update balance
-    const balanceKey = 'available_balance_' + userId;
-    localStorage.setItem(balanceKey, data.newBalance);
-    updateBalanceInfo();
-
-    alert(`Plan started! Target ${data.totalTarget} L over ${data.durationDays} day(s).`);
-    document.getElementById('btn-start-plan').disabled = true;
   }
 
-  // (g) Sensor polling & payment callback
-  loadSensorData();
-  setInterval(loadSensorData, 5000);
+  // --- SHOW PLAN SUMMARY (UI) ---
+  function showPlanSummary({ planId, dailyTarget, totalTarget, duration }) {
+    function set(id, value, digits = 2) {
+      const el = safe.el(id); if (!el) return;
+      if (typeof value === 'number') el.textContent = value.toFixed(digits);
+      else el.textContent = (value ?? '—');
+    }
+    set('ps-daily-target', Number(dailyTarget || 0));
+    set('ps-total-target', Number(totalTarget || 0));
+    const elPsDuration = safe.el('ps-duration'); if (elPsDuration) elPsDuration.textContent = (duration ?? 0);
+    const elDur = safe.el('plan-duration-days'); if (elDur) elDur.textContent = (duration ?? '—');
+
+    safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
+    safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+  }  
+
+  // --- plan status badge helper ---
+  function setPlanStatusText(status) {
+    const el = safe.el('plan-status');
+    if (!el) return;
+    const st = (status === 'active') ? 'Active'
+             : (status === 'completed') ? 'Completed'
+             : (status === 'cancelled') ? 'Cancelled'
+             : (status ?? 'Unknown');
+    el.textContent = st;
+    el.classList.toggle('active', status === 'active');
+    el.classList.toggle('completed', status === 'completed');
+    el.classList.toggle('cancelled', status === 'cancelled');
+  }
+
+  // --- MANUAL OPEN (web button) ---
+  async function handleManualOpen() {
+    if (!userId) return alert('User not identified.');
+    try {
+      const resp = await fetch('/api/valve/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      if (resp.ok) {
+        alert('Valve reopened (manual).');
+        safe.el('valve-status') && (safe.el('valve-status').textContent = 'OPEN (manual)');
+        await updatePlanUI(userId);
+      } else {
+        const err = await resp.json().catch(()=>({}));
+        console.error('Manual open failed', err);
+        alert('Could not reopen valve.');
+      }
+    } catch (err) {
+      console.error('Manual open net error', err);
+      alert('Network error when trying to reopen valve.');
+    }
+  }
+
+  async function handleManualClose() {
+    const uid = localStorage.getItem('user_id');
+    if (!uid) return alert('User not identified.');
+    try {
+      const resp = await fetch('/api/valve/close', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ userId: uid })
+      });
+      if (resp.ok) {
+        safe.el('valve-status') && (safe.el('valve-status').textContent = 'CLOSED (manual)');
+        alert('Valve closed (manual).');
+        await updatePlanUI(uid);
+      } else {
+        alert('Could not close valve.');
+      }
+    } catch (err) {
+      console.error('Manual close error', err);
+      alert('Network error when trying to close valve.');
+    }
+  }
+
+  // --- CANCEL PLAN (web button) ---
+  async function handleCancelPlan() {
+    if (!userId) return alert('User not identified.');
+    if (!confirm('Are you sure you want to cancel the current plan?')) return;
+
+    try {
+      const resp = await fetch('/api/plans/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+       });
+
+      const data = await resp.json().catch(()=>null);
+      console.log('⬅️ Cancel plan response:', resp.status, data);
+  
+      if (!resp.ok) return alert(data?.error || 'Could not cancel plan.');
+
+      alert('Plan cancelled.');
+      stopPollingDeviceState();
+      safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
+      safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+      safe.el('valve-status') && (safe.el('valve-status').textContent = 'CLOSED');
+    } catch (err) {
+      console.error('Cancel plan error', err);
+      alert('Network error when cancelling plan.');
+    }
+  }
+
+  // bind click listeners
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'btn-manual-open') handleManualOpen();
+    if (e.target && e.target.id === 'btn-manual-close') handleManualClose();
+    if (e.target && e.target.id === 'cancelPlanBtn') handleCancelPlan();
+  });
+
+  // ---------- Polling & plan persistence helpers (DROP-IN REPLACEMENT) ----------
+
+  let deviceStatePollTimer = null;
+  let lastPlan = null; // persist last-known plan so UI can show summary after completion
+
+  async function fetchDeviceState(uid) {
+    if (!uid) return null;
+    try {
+      const resp = await fetch(`/api/device/state?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
+      if (!resp.ok) { console.warn('device/state fetch failed', resp.status); return null; }
+      return await resp.json().catch(()=>null);
+    } catch (err) {
+      console.error('fetchDeviceState error', err);
+      return null;
+    }
+  }
+
+  // helper: fetch the most recent plan (active or completed)
+  // server must implement GET /api/plans/latest?userId=...
+  async function fetchLatestPlan(uid) {
+    if (!uid) return null;
+    try {
+      const resp = await fetch(`/api/plans/latest?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
+      if (!resp.ok) return null;
+      const obj = await resp.json().catch(()=>null);
+      return obj?.plan ?? null;
+    } catch (err) {
+      console.warn('fetchLatestPlan failed', err);
+      return null;
+    }
+  }
+
+  // updatePlanUI: show plan summary (persisted) and always prefer device state for valve pill
+  async function updatePlanUI(uid) {
+    try {
+      if (!uid) return;
+      const device = await fetchDeviceState(uid);        // may include plan if active
+      let planObj = device?.plan ?? null;
+
+      if (!planObj) {
+        // no active plan in device/state — try latest plan from DB
+        planObj = await fetchLatestPlan(uid);
+      }  
+
+      // If we have a plan (active or completed), map fields and persist to lastPlan
+      if (planObj) {
+        // map different naming schemes into a consistent shape
+        const p = {
+          id: planObj.planId ?? planObj.id ?? planObj.plan_id ?? null,
+          perDayTarget: Number(planObj.perDayTarget ?? planObj.per_day_target ?? planObj.dailyTarget ?? 0),
+          totalTarget: Number(planObj.totalTarget ?? planObj.total_target_liters ?? 0),
+          durationDays: Number(planObj.durationDays ?? planObj.duration_days ?? planObj.duration ?? 0),
+          daysElapsed: Number(planObj.daysElapsed ?? planObj.days_elapsed ?? 0),
+          daysLeft: Number(planObj.daysLeft ?? planObj.days_left ?? 0),
+          consumedToday: Number(planObj.consumedToday ?? planObj.consumed_today ?? 0),
+          remainingToday: Number(planObj.remainingToday ?? planObj.remaining_today ?? 0),
+          endDate: planObj.endDate ?? planObj.end_date ?? '-',
+          status: planObj.status ?? (planObj.daysLeft === 0 ? 'completed' : 'active')
+        };
+
+        lastPlan = p; // persist on client
+
+        // write UI fields safely
+        safe.el('ps-daily-target') && (safe.el('ps-daily-target').textContent = p.perDayTarget.toFixed(2));
+        safe.el('ps-total-target') && (safe.el('ps-total-target').textContent = p.totalTarget.toFixed(2));
+        safe.el('ps-duration') && (safe.el('ps-duration').textContent = p.durationDays);
+        safe.el('plan-duration-days') && (safe.el('plan-duration-days').textContent = p.durationDays);
+        safe.el('plan-days-elapsed') && (safe.el('plan-days-elapsed').textContent = (p.daysElapsed ?? '—'));
+        safe.el('plan-days-left') && (safe.el('plan-days-left').textContent = (p.daysLeft ?? '—'));
+        safe.el('plan-consumed-today') && (safe.el('plan-consumed-today').textContent = (p.consumedToday ?? '0.00'));
+        safe.el('plan-remaining-today') && (safe.el('plan-remaining-today').textContent = (p.remainingToday ?? '0.00'));
+        safe.el('plan-end-date') && (safe.el('plan-end-date').textContent = (p.endDate ?? '-'));
+        if (safe.el('plan-status')) safe.el('plan-status').textContent = p.status;
+
+        // always show plan summary (persist it even if completed) and hide calculator
+        safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
+        safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+      } else {
+        // truly no plan found anywhere — hide summary and show calculator
+        safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
+        safe.el('planner-result') && (safe.el('planner-result').hidden = false);
+      }
+
+      // ---- Valve pill logic: prefer device flags so it reflects current relay state ----
+      const vsEl = safe.el('valve-status');
+      if (vsEl && device) {
+        // normalize classes
+        vsEl.classList.remove('open','closed','manual');
+
+        const manual = !!device.manualOverride || device.valveReason === 'manual_override';
+        // if device.valveOpen explicitly provided use it; otherwise try to infer from reason/availableBalance
+        const hasOpenFlag = (typeof device.valveOpen === 'boolean');
+        const open = hasOpenFlag ? device.valveOpen : (device.availableBalance > 0 && device.valveReason !== 'no_balance');
+
+        if (manual) {
+          vsEl.textContent = open ? 'OPEN (manual)' : 'CLOSED (manual)';
+          vsEl.classList.add('manual');
+        } else {
+          vsEl.textContent = open ? 'OPEN' : 'CLOSED';
+          vsEl.classList.add(open ? 'open' : 'closed');
+        }
+      }
+ 
+      // Do NOT stop polling here — keep polling so user can reopen the valve after completion
+      if (lastPlan && lastPlan.status === 'completed') {
+        console.log('Plan completed: UI persisted but polling continues so manual actions are available.');
+      }
+    } catch (err) {
+      console.error('updatePlanUI error:', err);
+    }
+  }
+
+  function startPollingDeviceState(uid, intervalMs = 10000) {
+    if (!uid) return;
+    if (deviceStatePollTimer) clearInterval(deviceStatePollTimer);
+    // first immediate call
+    updatePlanUI(uid);
+    deviceStatePollTimer = setInterval(() => updatePlanUI(uid), intervalMs);
+  }
+
+  function stopPollingDeviceState() {
+    if (deviceStatePollTimer) {
+      clearInterval(deviceStatePollTimer);
+      deviceStatePollTimer = null;
+    }
+  }
+
+  // ON LOAD: seed the UI with latest plan (active or completed), then start polling
+  (async function checkActivePlanOnLoad() {
+    try {
+      if (!userId) {
+        safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
+        safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+        return;
+      }
+
+      console.log('📡 Checking active plan for user:', userId);
+      // First try the active endpoint (fast path)
+      const resp = await fetch(`/api/plans/active?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+      const data = await resp.json().catch(()=>null);
+      console.log('⬅️ Active plan check:', data);
+
+      if (data && data.active && data.plan) {
+        // Active — render and start polling
+        lastPlan = {
+          id: data.plan.id,
+          perDayTarget: Number(data.plan.perDayTarget ?? data.plan.per_day_target ?? 0),
+          totalTarget: Number(data.plan.totalTarget ?? 0),
+          durationDays: Number(data.plan.durationDays ?? data.plan.duration ?? 0),
+          daysElapsed: Number(data.plan.daysElapsed ?? 0),
+          daysLeft: Number(data.plan.daysLeft ?? 0),
+          consumedToday: Number(data.plan.consumedToday ?? 0),
+          remainingToday: Number(data.plan.remainingToday ?? 0),
+          endDate: data.plan.endDate ?? '-',
+          status: 'active'
+        };
+
+        // render via updatePlanUI (which prefers device flags for valve)
+        startPollingDeviceState(userId, 10000);
+        return;
+      }
+
+      // No active plan — try latest plan (completed or last)
+      const last = await fetchLatestPlan(userId);
+      if (last) {
+        // map and persist
+        lastPlan = {
+          id: last.id ?? last.planId,
+          perDayTarget: Number(last.perDayTarget ?? last.per_day_target ?? 0),
+          totalTarget: Number(last.totalTarget ?? last.total_target_liters ?? 0),
+          durationDays: Number(last.durationDays ?? last.duration_days ?? 0),
+          daysElapsed: Number(last.daysElapsed ?? 0),
+          daysLeft: Number(last.daysLeft ?? 0),
+          consumedToday: Number(last.consumedToday ?? 0),
+          remainingToday: Number(last.remainingToday ?? 0),
+          endDate: last.endDate ?? last.end_date ?? '-',
+          status: last.status ?? 'completed'
+        };
+
+        // render persisted summary and still start polling to update valve pill
+        // show summary (updatePlanUI will also be called immediately by startPollingDeviceState)
+        safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
+        safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+        safe.el('ps-daily-target') && (safe.el('ps-daily-target').textContent = (lastPlan.perDayTarget || 0).toFixed(2));
+        safe.el('ps-total-target') && (safe.el('ps-total-target').textContent = (lastPlan.totalTarget || 0).toFixed(2));
+        safe.el('plan-status') && (safe.el('plan-status').textContent = lastPlan.status);
+
+        startPollingDeviceState(userId, 10000);
+        return;
+      }
+
+      // fallback: no plan at all
+      safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
+      safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+    } catch (err) {
+      console.error('Active plan check failed:', err);
+    }
+  })();
+
+
+
+
+  // ---------- sensor polling & payment callback (unchanged) ----------
+  try { if (typeof loadSensorData === 'function') { loadSensorData(); setInterval(loadSensorData, 5000); } } catch (e) { console.warn('loadSensorData not available', e); }
 
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("payment") === "success") {
     const paymentType = urlParams.get("type");
     const amount = parseFloat(urlParams.get("amount")) || 0;
-    const userId = localStorage.getItem("user_id");
-    if (userId) {
+    const uid = localStorage.getItem("user_id");
+    if (uid) {
       if (paymentType === "prepaid") {
-        localStorage.setItem(
-          `last_payment_${userId}`,
-          JSON.stringify({ amount, date: new Date().toISOString() })
-        );
-        updateLastPaymentDisplay();
-        const balKey = "available_balance_" + userId;
+        localStorage.setItem(`last_payment_${uid}`, JSON.stringify({ amount, date: new Date().toISOString() }));
+        updateLastPaymentDisplay?.();
+        const balKey = "available_balance_" + uid;
         const newBal = (parseFloat(localStorage.getItem(balKey)) || 0) + amount;
         localStorage.setItem(balKey, newBal.toFixed(2));
-        updateBalanceInfo();
-        updateBalanceInBackend(userId, newBal);
+        updateBalanceInfo?.(uid);
+        updateBalanceInBackend?.(uid, newBal);
         alert(`Success! ₦${amount.toFixed(2)} added to your balance.`);
       } else if (paymentType === "postpaid") {
-        localStorage.setItem(
-          `last_payment_${userId}`,
-          JSON.stringify({ amount, date: new Date().toISOString() })
-        );
-        updateLastPaymentDisplay();
-        localStorage.setItem(`postpaid_owed_${userId}`, "0");
-        updatePostpaidOwed();
+        localStorage.setItem(`last_payment_${uid}`, JSON.stringify({ amount, date: new Date().toISOString() }));
+        updateLastPaymentDisplay?.();
+        localStorage.setItem(`postpaid_owed_${uid}`, "0");
+        updatePostpaidOwed?.(uid);
         alert("Postpaid invoice settled successfully!");
       }
       window.history.replaceState({}, document.title, window.location.pathname);
