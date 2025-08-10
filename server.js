@@ -398,33 +398,23 @@ app.post("/update_balance", async (req, res) => {
   }
 });
 
-// server.js — replace existing /valve_states route with this
+
+// GET /valve_states - robust, verbose logging
 app.get('/valve_states', async (req, res) => {
   try {
-    // CONFIG: policy - 'safety-first' will make plan/balance override manual override.
-    // Change to 'manual-first' if you want manual override to always win.
-    const POLICY = 'safety-first'; // 'safety-first' | 'manual-first'
+    const userIds = [1,2,3]; // adjust as needed
 
-    // Users to check (adjust as needed)
-    const userIds = [1,2,3];
-
-    // Fetch balances + manual flags
+    // 1) fetch balances (do not trust initial manual flag here; we'll re-read per-user after potential updates)
     const [rows] = await pool.query(
       `SELECT u.id AS user_id,
-              COALESCE(u.available_balance, 0) AS available_balance,
-              COALESCE(v.is_open, 0)       AS manual_is_open
-         FROM users u
-         LEFT JOIN valve_state v ON v.user_id = u.id
-        WHERE u.id IN (?,?,?)
-        ORDER BY u.id`,
+              COALESCE(u.available_balance, 0) AS available_balance
+       FROM users u
+       WHERE u.id IN (?,?,?)
+       ORDER BY u.id`,
       userIds
     );
+    console.log('[/valve_states] balances:', rows);
 
-    console.log('[/valve_states] fetched rows:', rows);
-
-    // Helper: check active plan and decide whether plan allows open.
-    // - handles meter rollover by resyncing plan.start_volume
-    // - marks plan completed when limit or duration reached
     async function planAllowsOpen(userId) {
       const [[plan]] = await pool.execute(
         `SELECT id, start_volume, per_day_target, total_target_liters, duration_days, start_datetime, last_reset_date
@@ -434,36 +424,34 @@ app.get('/valve_states', async (req, res) => {
           LIMIT 1`,
         [userId]
       );
-      if (!plan) return { allowsOpen: false, reason: 'no_plan' };
+      if (!plan) {
+        return { allowsOpen: false, reason: 'no_plan' };
+      }
 
-      // latest sensor row
+      // latest meter reading
       const [[meterRow]] = await pool.execute(
         `SELECT volume, timestamp FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
         [userId]
       );
       const currVol = parseFloat(meterRow?.volume || 0);
 
-      // Use recorded start_volume if exists; otherwise treat startVol == currVol to avoid counting prior flow
+      // use recorded start_volume; if missing, treat startVol as currVol (so pre-plan usage doesn't count)
       let startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
                        ? parseFloat(plan.start_volume || 0)
                        : currVol;
 
-      // If meter rolled over (currVol < startVol), treat consumedToday = currVol and resync DB
+      // handle rollover (currVol < startVol)
       let consumedToday;
       if (currVol >= startVol) {
         consumedToday = currVol - startVol;
       } else {
-        // Rollover detected
         consumedToday = currVol;
         try {
-          await pool.execute(
-            `UPDATE user_plans SET start_volume = ? WHERE id = ?`,
-            [currVol, plan.id]
-          );
+          await pool.execute(`UPDATE user_plans SET start_volume = ? WHERE id = ?`, [currVol, plan.id]);
+          console.log(`[planAllowsOpen] rollover: resynced start_volume for plan ${plan.id} -> ${currVol}`);
           startVol = currVol;
-          console.log(`[planAllowsOpen] resynced start_volume for plan ${plan.id} user ${userId} -> ${currVol}`);
-        } catch (updErr) {
-          console.error('[planAllowsOpen] failed to resync start_volume:', updErr);
+        } catch (e) {
+          console.error('[planAllowsOpen] failed to resync start_volume', e);
         }
       }
 
@@ -476,82 +464,119 @@ app.get('/valve_states', async (req, res) => {
 
       console.log(`[planAllowsOpen] user=${userId} planId=${plan.id} currVol=${currVol} startVol=${startVol} consumedToday=${consumedToday} perDay=${perDay} daysElapsed=${daysElapsed} duration=${duration}`);
 
-      // If finished by days or daily limit, mark completed
       if (exceedDays || hitToday) {
         const reason = exceedDays ? 'duration_complete' : 'daily_limit';
+        // mark plan completed
         try {
-          await pool.execute(
-            `UPDATE user_plans
-                SET status = 'completed',
-                    completed_at = NOW()
-              WHERE id = ? AND status = 'active'`,
+          const [r] = await pool.execute(
+            `UPDATE user_plans SET status='completed', completed_at = NOW() WHERE id = ? AND status = 'active'`,
             [plan.id]
           );
-          console.log(`[planAllowsOpen] plan ${plan.id} marked completed for user ${userId} due to ${reason}`);
-        } catch (updErr) {
-          console.error('[planAllowsOpen] failed to mark plan completed:', updErr);
+          console.log(`[planAllowsOpen] marked plan ${plan.id} completed (user ${userId}) result:`, r);
+        } catch (e) {
+          console.error('[planAllowsOpen] failed to mark plan completed', e);
         }
+
+        // clear manual open flag (so MCU will receive closed on next poll)
+        try {
+          const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [userId]);
+          console.log(`[planAllowsOpen] cleared valve_state.is_open for user ${userId} result:`, u);
+        } catch (e) {
+          console.error('[planAllowsOpen] failed to clear valve_state.is_open', e);
+        }
+
         return { allowsOpen: false, reason, consumedToday, perDay, daysElapsed, duration };
       }
 
       return { allowsOpen: true, reason: 'plan_ok', consumedToday, perDay, daysElapsed, duration };
     }
 
-    // Compute policy for each user
     const result = {};
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       const uid = r.user_id;
       const balance = parseFloat(r.available_balance || 0);
-      const manualOpen = !!r.manual_is_open;
 
-      // planInfo may also mark plan completed as side effect
+      // If balance <= 0 => must close. Clear manual flag.
+      if (balance <= 0) {
+        try {
+          const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
+          console.log(`[valve_states] balance<=0: cleared manual flag for user ${uid}`, u);
+        } catch (e) {
+          console.error(`[valve_states] failed clearing manual for user ${uid}`, e);
+        }
+        result[`user${uid}_state`] = false;
+        result[`user${uid}_reason`] = 'no_balance';
+        result[`user${uid}_consumedToday`] = null;
+        result[`user${uid}_perDayTarget`] = null;
+        result[`user${uid}_daysElapsed`] = null;
+        result[`user${uid}_duration`] = null;
+        continue;
+      }
+
+      // Run plan logic (may mark completed and clear manual flag)
       let planInfo;
       try {
         planInfo = await planAllowsOpen(uid);
       } catch (e) {
-        console.error(`[valve_states] planAllowsOpen failed for user ${uid}:`, e);
+        console.error(`[valve_states] planAllowsOpen failed for ${uid}`, e);
         planInfo = { allowsOpen: false, reason: 'plan_check_error' };
       }
 
-      // Decide final open boolean using chosen policy — safety-first by default
-      let open = false;
-      let reason = 'idle';
+      // Re-read the manual flag now (after planAllowsOpen possibly updated DB)
+      const [[vrow]] = await pool.execute(`SELECT is_open FROM valve_state WHERE user_id = ? LIMIT 1`, [uid]);
+      const manualOpenNow = !!vrow?.is_open;
+      console.log(`[valve_states] user ${uid} manualOpenNow:`, manualOpenNow);
 
-      // Safety-first: balance and plan completion override manual opens
-      if (balance <= 0) {
-        open = false; reason = 'no_balance';
-      } else if (planInfo && !planInfo.allowsOpen) {
-        // a plan exists but disallows open (daily limit or duration) -> close
-        open = false; reason = planInfo.reason || 'plan_block';
-      } else if (manualOpen && POLICY === 'manual-first') {
-        // manual-first policy: manual override can force open
-        open = true; reason = 'manual_override';
-      } else if (planInfo && planInfo.allowsOpen) {
-        // plan allows open and balance > 0 -> open
-        open = true; reason = planInfo.reason || 'plan_ok';
-      } else if (manualOpen && POLICY === 'safety-first') {
-        // safety-first: manual only opens if there is no plan-block and balance > 0
-        open = true; reason = 'manual_override';
-      } else {
-        open = false; reason = 'no_plan';
+      // If plan exists (planInfo.reason !== 'no_plan') => follow plan result.
+      if (planInfo && planInfo.reason !== 'no_plan') {
+        if (planInfo.allowsOpen) {
+          result[`user${uid}_state`] = true;
+          result[`user${uid}_reason`] = planInfo.reason || 'plan_ok';
+        } else {
+          // plan blocks open -> ensure DB manual flag cleared
+          if (manualOpenNow) {
+            try {
+              const [u] = await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
+              console.log(`[valve_states] plan blocked -> cleared manual for ${uid}`, u);
+            } catch (e) {
+              console.error(`[valve_states] failed clear manual (plan blocked) for ${uid}`, e);
+            }
+          }
+          result[`user${uid}_state`] = false;
+          result[`user${uid}_reason`] = planInfo.reason || 'plan_block';
+        }
+
+        // debug numbers
+        result[`user${uid}_consumedToday`] = planInfo?.consumedToday ?? null;
+        result[`user${uid}_perDayTarget`]  = planInfo?.perDay ?? null;
+        result[`user${uid}_daysElapsed`]   = planInfo?.daysElapsed ?? null;
+        result[`user${uid}_duration`]      = planInfo?.duration ?? null;
+        continue;
       }
 
-      result[`user${uid}_state`]        = !!open;
-      result[`user${uid}_reason`]       = reason;
-      result[`user${uid}_consumedToday`]= planInfo?.consumedToday ?? null;
-      result[`user${uid}_perDayTarget`] = planInfo?.perDay ?? null;
-      result[`user${uid}_daysElapsed`]  = planInfo?.daysElapsed ?? null;
-      result[`user${uid}_duration`]     = planInfo?.duration ?? null;
+      // No active plan: honor manual flag (since balance > 0)
+      if (manualOpenNow) {
+        result[`user${uid}_state`] = true;
+        result[`user${uid}_reason`] = 'manual_override';
+      } else {
+        result[`user${uid}_state`] = false;
+        result[`user${uid}_reason`] = 'no_plan';
+      }
+      result[`user${uid}_consumedToday`] = null;
+      result[`user${uid}_perDayTarget`]  = null;
+      result[`user${uid}_daysElapsed`]   = null;
+      result[`user${uid}_duration`]      = null;
     }
 
     console.log('[/valve_states] result:', result);
     return res.json(result);
   } catch (err) {
-    console.error('Error in /valve_states:', err);
+    console.error('Error in /valve_states route:', err);
     return res.status(500).json({ error: 'DB error' });
   }
 });
+
 
 
 // Manual open (web button) -> sets valve_state.is_open = TRUE
