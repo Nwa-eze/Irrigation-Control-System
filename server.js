@@ -1,29 +1,26 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const mysql = require('mysql2/promise'); // Promise-based MySQL client
 const path = require('path');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Stripe dependency
+const stripe = require('stripe')('pk_test_51Qo6ArP6Eq8DZLKp1Jloq3I58N1MA1slOXKB8hK7IpgpdljVj33eVuOuc8MIYxdkilkQOtkLZgnR99oIy2W6bFSt00xSCHSgrM'); // Stripe dependency
 const axios = require("axios");
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 
 
 const app = express();
-app.use(cors({
-  origin: 'http://10.151.85.142:3005', // Your frontend URL
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
-}));
+app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 
 // Create a MySQL connection pool (adjust with your credentials)
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '', // Your MySQL password
-  database: 'water distribution', // Database name with space
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -114,11 +111,13 @@ app.post('/register', async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
+  console.log("Login attempt for user:", username);
+  console.log("Password:", password);
 
   try {
     // Pull id, name, location, farm_id, matric_number
     const [rows] = await pool.execute(
-      `SELECT id, name, location, farm_id, matric_number
+      `SELECT id, username, location, farm_id
          FROM users
         WHERE username = ? AND password = ?
         LIMIT 1`,
@@ -133,10 +132,9 @@ app.post("/login", async (req, res) => {
     // On success, send back JSON (status defaults to 200)
     res.json({
       userId:        user.id,
-      name:          user.name,
+      username:      user.username,
       location:      user.location,
       farm_id:       user.farm_id,
-      matric_number: user.matric_number
     });
 
   } catch (error) {
@@ -217,8 +215,8 @@ app.post("/create-postpaid-session", async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `http://10.151.85.142:3005/dashboard.html?payment=success&type=postpaid&amount=${amount}&userId=${userId}`,
-      cancel_url: 'http://10.151.85.142:3005/dashboard.html?payment=cancel',
+      success_url: `/dashboard.html?payment=success&type=postpaid&amount=${amount}&userId=${userId}`,
+      cancel_url: '/dashboard.html?payment=cancel',
       metadata: {
         payment_type: 'postpaid',
         user_id: userId
@@ -242,7 +240,7 @@ app.post('/api/paystack/initialize', async (req, res) => {
         email: 'hellozed10@gmail.com',    // hardcode or pull from users table
         amount: Math.round(amount * 100),                // in kobo
         metadata: { userId, type },
-        callback_url: `http://10.151.85.142:3005/api/paystack/callback`
+        callback_url: `/api/paystack/callback`
       },
     );
     res.json(response.data.data);
@@ -290,9 +288,9 @@ app.post("/create-checkout-session", async (req, res) => {
       mode: 'payment',
       // ←– note the addition of `type=prepaid`
       success_url:
-        'http://10.151.85.142:3005/dashboard.html?payment=success&type=prepaid&amount=' +
+        '/dashboard.html?payment=success&type=prepaid&amount=' +
         amount,
-      cancel_url: 'http://10.151.85.142:3005/cancel.html',
+      cancel_url: '/cancel.html',
     });
     res.json({ id: session.id });
   } catch (error) {
@@ -312,7 +310,7 @@ app.post("/paystack/initialize", async (req, res) => {
         email,
         amount,
         metadata,
-        callback_url: `http://10.151.85.142:3005/paystack/callback`,
+        callback_url: `/paystack/callback`,
       },
       {
         headers: {
@@ -575,5 +573,5 @@ app.get('/api/device/state', async (req, res) => {
 const PORT = 3005;
 const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running at http://10.151.85.142:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3005:3005"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - STRIPE_SECRET_KEY=pk_test_51Qo6ArP6Eq8DZLKp1Jloq3I58N1MA1slOXKB8hK7IpgpdljVj33eVuOuc8MIYxdkilkQOtkLZgnR99oIy2W6bFSt00xSCHSgrM
