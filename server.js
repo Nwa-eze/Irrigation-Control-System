@@ -91,80 +91,87 @@ async function getConsumedTodayForPlan(planId, dayDate) {
 // --------------------
 // Registration Endpoint (optional, for new users)
 // --------------------
+// Example server-side code snippet for /register endpoint
 app.post('/register', async (req, res) => {
-  const {
-    username,
-    password,
-    profile,
-    address,
-    farm
-  } = req.body;
+  const { user, profile, address } = req.body;
 
-  // Destructure nested objects
-  const {
-    email,
-    phone,
-    full_name,
-    date_of_birth,
-    gender
-  } = profile || {};
+  // Helper function to replace undefined with null in objects
+  const replaceUndefinedWithNull = (obj) => {
+    const newObj = {};
+    for (const key in obj) {
+      newObj[key] = obj[key] === undefined ? null : obj[key];
+    }
+    return newObj;
+  };
 
-  const {
-    address_line1,
-    address_line2,
-    city,
-    state_province,
-    country,
-    postal_code
-  } = address || {};
+  // Clean the payloads
+  const cleanedUser = replaceUndefinedWithNull(user);
+  const cleanedProfile = replaceUndefinedWithNull(profile);
+  const cleanedAddress = replaceUndefinedWithNull(address);
 
-  const {
-    location,
-    farm_id
-  } = farm || {};
-
-  const conn = await pool.getConnection();
+  let connection;
   try {
-    await conn.beginTransaction();
+    connection = await pool.getConnection(); // Assuming you're using a connection pool
+    await connection.beginTransaction();
 
-    // 1) Insert into users
-    const [userResult] = await conn.execute(
-      `INSERT INTO users
-         (username, password, location, farm_id)
-       VALUES (?, ?, ?, ?)`,
-      [username, password, location, farm_id]
-    );
+    // Insert into users (example query - adjust to your exact columns)
+    const userQuery = `
+      INSERT INTO users (username, password, location, farm_id, matric_number, name)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    const userParams = [
+      cleanedUser.username,
+      cleanedUser.password, // Assume hashed on server
+      cleanedUser.location,
+      cleanedUser.farm_id,
+      cleanedUser.matric_number,
+      cleanedUser.name // This sets the 'name' column to full name
+    ];
+    const [userResult] = await connection.execute(userQuery, userParams);
     const userId = userResult.insertId;
 
-    // 2) Insert into user_profiles
-    await conn.execute(
-      `INSERT INTO user_profiles
-         (user_id, email, phone, full_name, date_of_birth, gender)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, email, phone, full_name, date_of_birth, gender]
-    );
+    // Insert into user_profiles
+    const profileQuery = `
+      INSERT INTO user_profiles (user_id, email, phone, full_name, date_of_birth, gender)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    const profileParams = [
+      userId,
+      cleanedProfile.email,
+      cleanedProfile.phone,
+      cleanedProfile.full_name,
+      cleanedProfile.date_of_birth,
+      cleanedProfile.gender
+    ];
+    await connection.execute(profileQuery, profileParams);
 
-    // 3) Insert into user_addresses (marking as primary)
-    await conn.execute(
-      `INSERT INTO user_addresses
-         (user_id, address_line1, address_line2, city, state_province, country, postal_code, is_primary)
-       VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
-      [userId, address_line1, address_line2, city, state_province, country, postal_code]
-    );
+    // Insert into user_addresses
+    const addressQuery = `
+      INSERT INTO user_addresses (user_id, address_line1, address_line2, city, state_province, country, postal_code, is_primary)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const addressParams = [
+      userId,
+      cleanedAddress.address_line1,
+      cleanedAddress.address_line2,
+      cleanedAddress.city,
+      cleanedAddress.state_province,
+      cleanedAddress.country,
+      cleanedAddress.postal_code,
+      cleanedAddress.is_primary
+    ];
+    await connection.execute(addressQuery, addressParams);
 
-    await conn.commit();
-    res.status(201).json({ message: 'User registered successfully.' });
-
+    await connection.commit();
+    res.status(201).json({ message: 'Registration successful' });
   } catch (error) {
-    await conn.rollback();
+    if (connection) await connection.rollback();
     console.error('Registration error:', error);
-    res.status(500).json({ error: 'Error registering user.' });
-
+    res.status(500).json({ error: 'Registration failed' });
   } finally {
-    conn.release();
+    if (connection) connection.release();
   }
 });
-
 
 
 // --------------------
