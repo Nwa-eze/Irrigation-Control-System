@@ -1,11 +1,11 @@
 let lastCostSeen = 0;
 let processedTimestamps = new Set();
 let lastVolumeSeen = 0;
-let dailyTotal     = 0;
-let monthlyTotal   = 0;
+let dailyTotal = 0;
+let monthlyTotal = 0;
 const processedVolumeTimestamps = new Set();
 
-const PAYSTACK_BASE_URL   = 'https://api.paystack.co';
+const PAYSTACK_BASE_URL = 'https://api.paystack.co';
 
 
 // ------------------------
@@ -51,18 +51,18 @@ async function loadSensorData() {
 }
 
 function updateWaterStats(data) {
-  const now       = new Date();
-  const Y         = now.getFullYear();
-  const M         = now.getMonth();
-  const D         = now.getDate();
-  const monthKey  = `${Y}-${M}`;
+  const now = new Date();
+  const Y = now.getFullYear();
+  const M = now.getMonth();
+  const D = now.getDate();
+  const monthKey = `${Y}-${M}`;
 
   const todayEntries = data
     .map(r => ({ ts: new Date(r.timestamp), vol: parseFloat(r.volume) || 0 }))
     .filter(e =>
       e.ts.getFullYear() === Y &&
-      e.ts.getMonth()    === M &&
-      e.ts.getDate()     === D
+      e.ts.getMonth() === M &&
+      e.ts.getDate() === D
     )
     .sort((a, b) => a.ts - b.ts);
 
@@ -82,7 +82,7 @@ function updateWaterStats(data) {
     .map(r => ({ ts: new Date(r.timestamp), vol: parseFloat(r.volume) || 0 }))
     .filter(e =>
       e.ts.getFullYear() === Y &&
-      e.ts.getMonth()    === M
+      e.ts.getMonth() === M
     )
     .sort((a, b) => a.ts - b.ts);
 
@@ -190,13 +190,13 @@ function createChart(data) {
 
 
 function updateAnalyticsInfo() {
-  const nameSpan    = document.getElementById("analytics-name");
-  const farmIdSpan  = document.getElementById("analytics-farm-id");
-  const matricSpan  = document.getElementById("analytics-matric");
+  const nameSpan = document.getElementById("analytics-name");
+  const farmIdSpan = document.getElementById("analytics-farm-id");
+  const matricSpan = document.getElementById("analytics-matric");
 
-  if (nameSpan)   nameSpan.textContent   = localStorage.getItem("user_name")      || "--";
-  if (farmIdSpan) farmIdSpan.textContent = localStorage.getItem("farm_id")        || "--";
-  if (matricSpan) matricSpan.textContent = localStorage.getItem("matric_number")  || "--";
+  if (nameSpan) nameSpan.textContent = localStorage.getItem("user_name") || "--";
+  if (farmIdSpan) farmIdSpan.textContent = localStorage.getItem("farm_id") || "--";
+  if (matricSpan) matricSpan.textContent = localStorage.getItem("matric_number") || "--";
 }
 
 
@@ -276,12 +276,12 @@ async function startPaystackPayment() {
 // 3) COST DEDUCTION AS USAGE HAPPENS
 // -------------------------------------------------
 function updateBalanceIfFlow(row) {
-  const userId     = localStorage.getItem("user_id");
+  const userId = localStorage.getItem("user_id");
   const balanceKey = "available_balance_" + userId;
-  const costKey    = "last_cost_seen_"    + userId;
-  const tsKey      = "last_ts_seen_"      + userId;
+  const costKey = "last_cost_seen_" + userId;
+  const tsKey = "last_ts_seen_" + userId;
 
-  const ts   = row.timestamp;
+  const ts = row.timestamp;
   const flow = parseFloat(row.flow) || 0;
   const cost = parseFloat(row.cost) || 0;
 
@@ -297,7 +297,7 @@ function updateBalanceIfFlow(row) {
 
   // 3) Pull last cost & balance from storage
   let lastCostSeen = parseFloat(localStorage.getItem(costKey)) || 0;
-  let balance      = parseFloat(localStorage.getItem(balanceKey)) || 0;
+  let balance = parseFloat(localStorage.getItem(balanceKey)) || 0;
 
   // 4) Reset logic if the meter cost ever drops to zero or below
   if (cost <= 0) {
@@ -326,8 +326,8 @@ function updateBalanceIfFlow(row) {
   lastCostSeen = cost;
   processedTimestamps.add(ts);
   localStorage.setItem(balanceKey, balance.toFixed(2));
-  localStorage.setItem(costKey,   lastCostSeen.toFixed(2));
-  localStorage.setItem(tsKey,     ts);
+  localStorage.setItem(costKey, lastCostSeen.toFixed(2));
+  localStorage.setItem(tsKey, ts);
 
   // 8) Reflect in UI (balance display, chart, etc.)
   updateBalanceInfo();
@@ -360,17 +360,17 @@ function showDeductionAlert(amount) {
 // 4) UPDATE “HOME” INFO
 // ------------------------
 function updateHomeInfo() {
-  const userNameSpan     = document.getElementById("user-name");
+  const userNameSpan = document.getElementById("user-name");
   const userLocationSpan = document.getElementById("user-location");
-  const farmIdSpan       = document.getElementById("farm-id");
+  const farmIdSpan = document.getElementById("farm-id");
   if (!userNameSpan || !userLocationSpan || !farmIdSpan) return;
 
-  const name     = localStorage.getItem("user_name")     || "Unknown";
+  const name = localStorage.getItem("user_name") || "Unknown";
   const location = localStorage.getItem("user_location") || "Unknown";
-  const farmId   = localStorage.getItem("farm_id")       || "000";
-  userNameSpan.textContent     = name;
+  const farmId = localStorage.getItem("farm_id") || "000";
+  userNameSpan.textContent = name;
   userLocationSpan.textContent = location;
-  farmIdSpan.textContent       = farmId;
+  farmIdSpan.textContent = farmId;
 }
 
 // -----------------------------
@@ -532,10 +532,10 @@ function updateLastPaymentDisplay() {
       const paidAmt = parseFloat(obj.amount).toFixed(2);
       const paidDate = new Date(obj.date);
       const formattedDate = paidDate.toLocaleString(undefined, {
-        year:   "numeric",
-        month:  "short",
-        day:    "2-digit",
-        hour:   "2-digit",
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
         minute: "2-digit"
       });
       lastElem.textContent = `₦${paidAmt} on ${formattedDate}`;
@@ -549,12 +549,12 @@ function updateLastPaymentDisplay() {
 
 
 function logout() {
-  
+
   localStorage.removeItem("user_id");
   localStorage.removeItem("user_name");
   localStorage.removeItem("user_location");
   localStorage.removeItem("farm_id");
-  
+
   window.location.href = "login.html";
 }
 
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       try {
         const resp = await p;
         console.log(`${label} → status:`, resp.status);
-        const json = await resp.json().catch(()=>null);
+        const json = await resp.json().catch(() => null);
         console.log(`${label} → body:`, json);
         return { resp, json };
       } catch (err) {
@@ -629,11 +629,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       showOnlySection(href);
     });
   });
-  safe.on('logout-btn','click', logout);
+  safe.on('logout-btn', 'click', logout);
 
   // ---------- Default section ----------
   const initialHash = window.location.hash.substring(1);
-  if (["home-section","analytics-section","payments-section","irrigation-planner"].includes(initialHash)) {
+  if (["home-section", "analytics-section", "payments-section", "irrigation-planner"].includes(initialHash)) {
     showOnlySection(initialHash);
   } else {
     window.location.hash = "home-section";
@@ -641,11 +641,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ---------- Attach payment & postpaid buttons (if present) ----------
-  safe.on('stripe-pay-btn','click', startStripePayment);
-  safe.on('paystack-pay-btn','click', startPaystackPayment);
-  safe.on('add-postpaid-btn','click', handleAddPostpaid);
-  safe.on('stripe-postpaid-btn','click', startPostpaidPayment);
-  safe.on('paystack-postpaid-btn','click', startPostpaidPaymentPaystack);
+  safe.on('stripe-pay-btn', 'click', startStripePayment);
+  safe.on('paystack-pay-btn', 'click', startPaystackPayment);
+  safe.on('add-postpaid-btn', 'click', handleAddPostpaid);
+  safe.on('stripe-postpaid-btn', 'click', startPostpaidPayment);
+  safe.on('paystack-postpaid-btn', 'click', startPostpaidPaymentPaystack);
 
   // ---------- Call site-wide updaters but don't crash if they don't exist ----------
   try { if (typeof updateHomeInfo === 'function') await updateHomeInfo(userId); } catch (e) { console.warn('updateHomeInfo failed', e); }
@@ -655,10 +655,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { if (typeof updateAnalyticsInfo === 'function') await updateAnalyticsInfo(userId); } catch (e) { console.warn('updateAnalyticsInfo failed', e); }
 
   // ---------- Planner UI refs ----------
-  const cropSelect   = safe.el('crop');
+  const cropSelect = safe.el('crop');
   const regionSelect = safe.el('region');
-  const stageSelect  = safe.el('stage');
-  const plannerForm  = safe.el('planner-form');
+  const stageSelect = safe.el('stage');
+  const plannerForm = safe.el('planner-form');
   const plannerResult = safe.el('planner-result');
   let currentCalc = null;
 
@@ -673,7 +673,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cropSelect.addEventListener('change', async () => {
       const crop = cropSelect.value;
       reset(regionSelect, 'Select region…');
-      reset(stageSelect,  'Select stage…');
+      reset(stageSelect, 'Select stage…');
       if (!crop) return;
       regionSelect.innerHTML += `<option>Loading…</option>`;
       try {
@@ -716,16 +716,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       const uid = localStorage.getItem('user_id');
       const payload = {
         userId: uid,
-        crop:   plannerForm.crop?.value || '',
+        crop: plannerForm.crop?.value || '',
         region: plannerForm.region?.value || '',
-        stage:  plannerForm.stage?.value || '',
-        area:   parseFloat(plannerForm.area?.value || 0)
+        stage: plannerForm.stage?.value || '',
+        area: parseFloat(plannerForm.area?.value || 0)
       };
       console.log('📤 [Planner] Calculate payload:', payload);
       try {
         const resp = await fetch('/api/plans/calculate', {
           method: 'POST',
-          headers: { 'Content-Type':'application/json' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           cache: 'no-store'
         });
@@ -736,7 +736,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         safe.el('daily-volume') && (safe.el('daily-volume').textContent = data.dailyVolume);
         safe.el('total-volume') && (safe.el('total-volume').textContent = data.totalTarget);
-        if (safe.el('water-cost')) safe.el('water-cost').textContent = ((parseFloat(data.totalTarget)||0) * 5).toFixed(2);
+        if (safe.el('water-cost')) safe.el('water-cost').textContent = ((parseFloat(data.totalTarget) || 0) * 5).toFixed(2);
         safe.el('flat-fee') && (safe.el('flat-fee').textContent = data.flatFee);
 
         let p = safe.el('plan-duration');
@@ -762,14 +762,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ---------- Planner + Plan lifecycle (updated) ----------
-/* Assumes:
-   - safe.el(id) -> document.getElementById(id) helper exists
-   - API endpoints:
-     POST /api/plans/start   (body { userId, crop, region, stage, area })
-     GET  /api/plans/active  (?userId=...)
-     POST /api/valve/open    (body { userId })
-     POST /api/plans/cancel  (body { userId })  <-- see note below
-*/
+  /* Assumes:
+     - safe.el(id) -> document.getElementById(id) helper exists
+     - API endpoints:
+       POST /api/plans/start   (body { userId, crop, region, stage, area })
+       GET  /api/plans/active  (?userId=...)
+       POST /api/valve/open    (body { userId })
+       POST /api/plans/cancel  (body { userId })  <-- see note below
+  */
 
 
   // --- START PLAN ---
@@ -834,16 +834,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
     safe.el('planner-result') && (safe.el('planner-result').hidden = true);
-  }  
+  }
 
   // --- plan status badge helper ---
   function setPlanStatusText(status) {
     const el = safe.el('plan-status');
     if (!el) return;
     const st = (status === 'active') ? 'Active'
-             : (status === 'completed') ? 'Completed'
-             : (status === 'cancelled') ? 'Cancelled'
-             : (status ?? 'Unknown');
+      : (status === 'completed') ? 'Completed'
+        : (status === 'cancelled') ? 'Cancelled'
+          : (status ?? 'Unknown');
     el.textContent = st;
     el.classList.toggle('active', status === 'active');
     el.classList.toggle('completed', status === 'completed');
@@ -864,7 +864,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         safe.el('valve-status') && (safe.el('valve-status').textContent = 'OPEN (manual)');
         await updatePlanUI(userId);
       } else {
-        const err = await resp.json().catch(()=>({}));
+        const err = await resp.json().catch(() => ({}));
         console.error('Manual open failed', err);
         alert('Could not reopen valve.');
       }
@@ -880,7 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const resp = await fetch('/api/valve/close', {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: uid })
       });
       if (resp.ok) {
@@ -906,11 +906,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
-       });
+      });
 
-      const data = await resp.json().catch(()=>null);
+      const data = await resp.json().catch(() => null);
       console.log('⬅️ Cancel plan response:', resp.status, data);
-  
+
       if (!resp.ok) return alert(data?.error || 'Could not cancel plan.');
 
       alert('Plan cancelled.');
@@ -941,7 +941,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const resp = await fetch(`/api/device/state?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (!resp.ok) { console.warn('device/state fetch failed', resp.status); return null; }
-      return await resp.json().catch(()=>null);
+      return await resp.json().catch(() => null);
     } catch (err) {
       console.error('fetchDeviceState error', err);
       return null;
@@ -955,7 +955,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const resp = await fetch(`/api/plans/latest?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (!resp.ok) return null;
-      const obj = await resp.json().catch(()=>null);
+      const obj = await resp.json().catch(() => null);
       return obj?.plan ?? null;
     } catch (err) {
       console.warn('fetchLatestPlan failed', err);
@@ -973,7 +973,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!planObj) {
         // no active plan in device/state — try latest plan from DB
         planObj = await fetchLatestPlan(uid);
-      }  
+      }
 
       // If we have a plan (active or completed), map fields and persist to lastPlan
       if (planObj) {
@@ -1018,7 +1018,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const vsEl = safe.el('valve-status');
       if (vsEl && device) {
         // normalize classes
-        vsEl.classList.remove('open','closed','manual');
+        vsEl.classList.remove('open', 'closed', 'manual');
 
         const manual = !!device.manualOverride || device.valveReason === 'manual_override';
         // if device.valveOpen explicitly provided use it; otherwise try to infer from reason/availableBalance
@@ -1033,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           vsEl.classList.add(open ? 'open' : 'closed');
         }
       }
- 
+
       // Do NOT stop polling here — keep polling so user can reopen the valve after completion
       if (lastPlan && lastPlan.status === 'completed') {
         console.log('Plan completed: UI persisted but polling continues so manual actions are available.');
@@ -1070,7 +1070,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('📡 Checking active plan for user:', userId);
       // First try the active endpoint (fast path)
       const resp = await fetch(`/api/plans/active?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-      const data = await resp.json().catch(()=>null);
+      const data = await resp.json().catch(() => null);
       console.log('⬅️ Active plan check:', data);
 
       if (data && data.active && data.plan) {

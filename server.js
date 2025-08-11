@@ -200,6 +200,7 @@ app.post("/login", async (req, res) => {
     }
 
     const user = rows[0];
+    console.log(user);
     // On success, send back JSON (status defaults to 200)
     res.json({
       userId:        user.id,
