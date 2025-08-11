@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const mysql = require('mysql2/promise'); // Promise-based MySQL client
 const path = require('path');
+const csv = require('csv-express');
 require('dotenv').config();   // ← this loads .env into process.env
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Stripe dependency
 const axios = require("axios");
@@ -12,7 +13,7 @@ const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 
 const app = express();
 app.use(cors({
-  origin: 'http://10.218.220.142:3005', // Your frontend URL
+  origin: 'http://10.32.164.142:3005', // Your frontend URL
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
@@ -212,6 +213,91 @@ app.post("/login", async (req, res) => {
 });
 
 
+// ================= ADMIN ROUTES =====================
+// GET /api/admin/users  -> returns small user list for dropdown
+app.post('/admin/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === 'admin' && password === 'admin123') {
+    res.json({ token: 'admin-token' }); // Hardcoded token
+  } else {
+    res.status(401).json({ error: 'Invalid credentials' });
+  }
+});
+
+// Middleware to check admin token
+const checkAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader === 'Bearer admin-token') {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+};
+
+app.get('/admin/users', checkAdmin, async (req, res) => {
+  try {
+    const [users] = await pool.query('SELECT id, username, name FROM users');
+    res.json(users);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/admin/user/:id', checkAdmin, async (req, res) => {
+  const userId = req.params.id;
+  try {
+    const [userRows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const user = userRows[0];
+
+    const [profileRows] = await pool.query('SELECT * FROM user_profiles WHERE user_id = ?', [userId]);
+    const profile = profileRows[0];
+
+    const [addressRows] = await pool.query('SELECT * FROM user_addresses WHERE user_id = ?', [userId]);
+    const address = addressRows[0];
+
+    const [valveRows] = await pool.query('SELECT * FROM valve_state WHERE user_id = ?', [userId]);
+    const valve = valveRows[0] || { is_open: 0, updated_at: null };
+
+    const [plans] = await pool.query(`
+      SELECT up.*, cwr.crop_name 
+      FROM user_plans up 
+      LEFT JOIN crop_water_requirements cwr ON up.crop_id = cwr.id 
+      WHERE up.user_id = ?
+    `, [userId]);
+
+    const [planDays] = await pool.query('SELECT * FROM user_plan_days WHERE plan_id IN (SELECT id FROM user_plans WHERE user_id = ?)', [userId]);
+
+    const [sensorData] = await pool.query('SELECT * FROM sensor_data WHERE user_id = ? ORDER BY timestamp DESC LIMIT 100', [userId]);
+
+    res.json({
+      user,
+      profile,
+      address,
+      valve,
+      plans,
+      plan_days: planDays,
+      sensor_data: sensorData
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/admin/sensor-csv/:userId', checkAdmin, async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const [sensorData] = await pool.query('SELECT * FROM sensor_data WHERE user_id = ? ORDER BY timestamp DESC', [userId]); // Full for export
+    res.csv(sensorData, true); // Using csv-express
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
 // --------------------
 // GET Endpoint to fetch sensor data filtered by user_id
 // --------------------
@@ -361,8 +447,8 @@ app.post("/create-postpaid-session", async (req, res) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `http://10.218.220.142:3005/dashboard.html?payment=success&type=postpaid&amount=${amount}&userId=${userId}`,
-      cancel_url: 'http://10.218.220.142:3005/dashboard.html?payment=cancel',
+      success_url: `http://10.32.164.142:3005/dashboard.html?payment=success&type=postpaid&amount=${amount}&userId=${userId}`,
+      cancel_url: 'http://10.32.164.142:3005/dashboard.html?payment=cancel',
       metadata: {
         payment_type: 'postpaid',
         user_id: userId
@@ -386,7 +472,7 @@ app.post('/api/paystack/initialize', async (req, res) => {
         email: 'hellozed10@gmail.com',    // hardcode or pull from users table
         amount: Math.round(amount),                // in kobo
         metadata: { userId, type },
-        callback_url: `http://10.218.220.142:3005/api/paystack/callback`
+        callback_url: `http://10.32.164.142:3005/api/paystack/callback`
       },
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
     );
@@ -436,9 +522,9 @@ app.post("/create-checkout-session", async (req, res) => {
       mode: 'payment',
       // ←– note the addition of `type=prepaid`
       success_url:
-        'http://10.151.85.142:3005/dashboard.html?payment=success&type=prepaid&amount=' +
+        'http://10.32.164.142:3005/dashboard.html?payment=success&type=prepaid&amount=' +
         amount,
-      cancel_url: 'http://10.218.220.142:3005/cancel.html',
+      cancel_url: 'http://10.32.164.142:3005/cancel.html',
     });
     res.json({ id: session.id });
   } catch (error) {
@@ -458,7 +544,7 @@ app.post("/paystack/initialize", async (req, res) => {
         email,
         amount,
         metadata,
-        callback_url: `http://10.218.220.142:3005/paystack/callback`,
+        callback_url: `http://10.32.164.142:3005/paystack/callback`,
       },
       {
         headers: {
@@ -1308,5 +1394,5 @@ app.get('/api/plans/stages', async (req, res) => {
 const PORT = 3005;
 const HOST = '0.0.0.0';
 app.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running at http://10.218.220.142:${PORT}`);
+  console.log(`🚀 Server running at http://10.32.164.142:${PORT}`);
 });
