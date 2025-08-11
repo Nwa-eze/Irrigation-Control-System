@@ -20,7 +20,7 @@ async function loadSensorData() {
   }
 
   try {
-    const response = await fetch(`http://10.32.164.142:3005/get_data?user_id=${userId}`, {
+    const response = await fetch(`/get_data?user_id=${userId}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -218,7 +218,7 @@ async function startStripePayment() {
   }
 
   try {
-    const resp = await fetch("http://10.32.164.142:3005/create-checkout-session", {
+    const resp = await fetch("/create-checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -254,7 +254,7 @@ async function startPaystackPayment() {
   }
 
   try {
-    const resp = await fetch("http://10.32.164.142:3005/paystack/initialize", {
+    const resp = await fetch("/paystack/initialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -392,7 +392,7 @@ function updateBalanceInfo() {
 
 async function updateBalanceInBackend(userId, balance) {
   try {
-    const response = await fetch("http://10.32.164.142:3005/update_balance", {
+    const response = await fetch("/update_balance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, available_balance: balance })
@@ -470,7 +470,7 @@ async function startPostpaidPayment() {
   }
 
   try {
-    const response = await fetch("http://10.32.164.142:3005/create-postpaid-session", {
+    const response = await fetch("/create-postpaid-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amount: owedAmount, userId, type: "postpaid" })
@@ -498,7 +498,7 @@ async function startPostpaidPaymentPaystack() {
   }
 
   try {
-    const resp = await fetch("http://10.32.164.142:3005/api/paystack/initialize", {
+    const resp = await fetch("/api/paystack/initialize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

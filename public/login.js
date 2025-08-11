@@ -3,7 +3,7 @@ async function login() {
   const password = document.getElementById("password").value;
 
   try {
-    const resp = await fetch("http://10.32.164.142:3005/login", {
+    const resp = await fetch("/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })

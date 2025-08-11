@@ -40,7 +40,7 @@ document.getElementById('register-form').addEventListener('submit', async e => {
   };
 
   try {
-    const resp = await fetch('/register', {   // keep your server endpoint here
+    const resp = await fetch('/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(payload)
