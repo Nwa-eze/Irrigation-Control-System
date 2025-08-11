@@ -2,130 +2,202 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta 
-    name="viewport" 
-    content="width=device-width, initial-scale=1.0"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cluster Farming & IoT Solutions</title>
-  <link rel="stylesheet" href="index.css" />
-  <!-- Google Fonts for a more polished look -->
+  <!-- React and dependencies via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.20.15/babel.min.js"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for typography -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@400;600&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Playfair+Display:wght@400;600;900&display=swap"
     rel="stylesheet"
   />
 </head>
 <body>
-  <!-- HERO SECTION -->
-  <header class="hero">
-    <div class="overlay">
-      <nav class="nav-bar">
-        <div class="logo">Cluster Farming</div>
-        <ul class="nav-links">
-          <li><a href="login.html">Login</a></li>
-          <li><a href="admin.html">Admin</a></li>
-        </ul>
-      </nav>
+  <div id="root"></div>
 
-      <div class="hero-content">
-        <h1>Revolutionizing Agricultural Practices with IoT</h1>
-        <p>
-          Harness the power of smart sensors, real‐time monitoring, and automated controls to
-          optimize water usage, boost yields, and drive sustainable growth in large‐scale farm clusters.
-        </p>
-        <div class="hero-buttons">
-          <a href="login.html" class="btn btn-primary">Login</a>
-          <a href="admin.html" class="btn btn-secondary">Admin Panel</a>
-        </div>
-      </div>
-    </div>
-  </header>
+  <script type="text/babel">
+    // Main App component to structure the page
+    function App() {
+      return (
+        <div className="font-montserrat text-gray-800 bg-gray-50">
+          {/* Hero Section - Enhanced with prominent Cluster Farming branding */}
+          <header
+            className="relative h-screen bg-cover bg-center flex items-center justify-center"
+            style={{ backgroundImage: `url('images/clusterfarm.jpg')` }}
+          >
+            {/* Dark overlay for text contrast */}
+            <div className="absolute inset-0 bg-black bg-opacity-70"></div>
+            <div className="relative text-center text-white px-4 max-w-4xl mx-auto">
+              {/* Large, bold Cluster Farming title */}
+              <h1 className="font-playfair text-5xl md:text-7xl font-extrabold mb-4 animate-zoom-in">
+                CLUSTER FARMING
+              </h1>
+              <p className="text-xl md:text-2xl mb-8 animate-slide-up font-semibold">
+                Innovate. Grow. Sustain.
+              </p>
+              <p className="text-base md:text-lg mb-10 max-w-2xl mx-auto">
+                Revolutionize agriculture with IoT-powered sensors, real-time monitoring, and automated
+                irrigation to maximize yields and promote sustainable farming across clusters.
+              </p>
+              <div className="flex justify-center gap-6 flex-wrap">
+                <a
+                  href="login.html"
+                  className="bg-green-600 text-white px-8 py-4 text-lg rounded-full font-semibold hover:bg-green-700 transition duration-300 transform hover:scale-105"
+                >
+                  Get Started
+                </a>
+                <a
+                  href="admin.html"
+                  className="bg-blue-600 text-white px-8 py-4 text-lg rounded-full font-semibold hover:bg-blue-700 transition duration-300 transform hover:scale-105"
+                >
+                  Admin Dashboard
+                </a>
+              </div>
+            </div>
+          </header>
 
-  <!-- ABOUT / INFO SECTION -->
-  <!-- INFO SECTION -->
-  <section class="info">
-    <div class="info-content">
-      <!-- Left column: text -->
-      <div class="info-text">
-        <h2>Cluster Farming & Smart Irrigation</h2>
-        <p>
-          Modern cluster-farmers are leveraging IoT sensors (flow, volume, cost) and automated valve control
-          to maximize yields and reduce waste. Our platform lets you monitor multiple users’ water usage
-          in real-time, pay online (prepaid or postpaid), and even predict your next month’s water needs
-          based on historic data.
-        </p>
-        <p>
-          Scroll the pictures on the right to see real‐world deployments: drip irrigation, sensor arrays,
-          and smart solenoid valves in action. Each installation can be managed by end-users via their
-          own dashboards, while administrators see all three farms at once.
-        </p>
-      </div>
-  
-      <!-- Right column: vertically scrollable images with captions -->
-      <div class="info-images">
-        <!-- 1st image + caption -->
-        <div class="image-with-caption">
-          <img src="images/irrigation.jpg" alt="Irrigation System" />
-          <p class="caption">Drip Irrigation Greenhouse</p>
-        </div>
-  
-        <!-- 2nd image + caption -->
-        <div class="image-with-caption">
-          <img src="images/sensor-array.jpg" alt="Sensor array monitoring soil moisture" />
-          <p class="caption">Soil Moisture & Flow Sensor Array</p>
-        </div>
-  
-        <!-- 3rd image + caption -->
-        <div class="image-with-caption">
-          <img src="images/clusterfarm.jpg" alt="Aerial View of Cluster Farm" />
-          <p class="caption">Automated Solenoid Valve Control</p>
-        </div>
-  
-        <!-- ...add more images+captions as needed... -->
-      </div>
-    </div>
-  </section>
-  
+          {/* Info Section - Highlighting Cluster Farming Technology */}
+          <section className="py-20 bg-white">
+            <div className="max-w-7xl mx-auto px-4">
+              <h2 className="font-playfair text-4xl md:text-5xl text-green-700 text-center mb-12 animate-fade-in">
+                Discover CLUSTER FARMING
+              </h2>
+              <div className="flex flex-col md:flex-row gap-12 items-center">
+                {/* Text Content */}
+                <div className="flex-1">
+                  <p className="text-lg text-gray-600 mb-6">
+                    <span className="font-bold text-green-700">Cluster Farming</span> transforms agriculture
+                    with cutting-edge IoT solutions. Monitor water usage, control irrigation systems, and
+                    optimize resources in real-time to boost productivity and sustainability.
+                  </p>
+                  <p className="text-lg text-gray-600">
+                    With <span className="font-bold text-green-700">Cluster Farming</span>, farmers access
+                    intuitive dashboards, while admins oversee multiple farms effortlessly. Pay online and
+                    predict water needs with data-driven insights.
+                  </p>
+                </div>
+                {/* Scrollable Image Gallery */}
+                <div className="flex-1 max-w-md max-h-[600px] overflow-y-auto rounded-xl shadow-2xl p-6 bg-gray-100">
+                  <div className="space-y-6">
+                    <div className="relative rounded-lg overflow-hidden shadow-md">
+                      <img src="images/irrigation.jpg" alt="Irrigation System" className="w-full h-auto object-cover" />
+                      <p className="absolute bottom-0 w-full bg-green-800 bg-opacity-75 text-white text-center py-3 text-sm font-semibold">
+                        Precision Drip Irrigation
+                      </p>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden shadow-md">
+                      <img src="images/sensor-array.jpg" alt="Sensor Array" className="w-full h-auto object-cover" />
+                      <p className="absolute bottom-0 w-full bg-green-800 bg-opacity-75 text-white text-center py-3 text-sm font-semibold">
+                        Soil & Flow Sensors
+                      </p>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden shadow-md">
+                      <img src="images/clusterfarm.jpg" alt="Cluster Farm" className="w-full h-auto object-cover" />
+                      <p className="absolute bottom-0 w-full bg-green-800 bg-opacity-75 text-white text-center py-3 text-sm font-semibold">
+                        Automated Valve Control
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-  <!-- FEATURE HIGHLIGHTS -->
-  <section class="features">
-    <div class="feature-card">
-      <img
-        src="images/analysis.jpg"
-        alt="Data Analytics"
-      />
-      <h3>Data‐Driven Insights</h3>
-      <p>
-        Visualize historical water usage, forecast irrigation needs, and optimize costs through 
-        our interactive dashboard.
-      </p>
-    </div>
-    <div class="feature-card">
-      <img
-        src="https://images.unsplash.com/photo-1509395176047-4a66953fd231?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
-        alt="Mobile Monitoring"
-      />
-      <h3>Remote Monitoring</h3>
-      <p>
-        Check sensor readings, valve statuses, and payment balances from anywhere via mobile or 
-        desktop.
-      </p>
-    </div>
-    <div class="feature-card">
-      <img
-        src="https://images.unsplash.com/photo-1542831371-d531d36971e6?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
-        alt="Sustainable Farming"
-      />
-      <h3>Sustainable Practices</h3>
-      <p>
-        Conserve water and reduce waste—our solenoid control and flow sensors ensure you only use 
-        what you need.
-      </p>
-    </div>
-  </section>
+          {/* Features Section - Showcasing Cluster Farming Benefits */}
+          <section className="py-20 bg-green-50">
+            <div className="max-w-7xl mx-auto px-4">
+              <h2 className="font-playfair text-4xl md:text-5xl text-green-800 text-center mb-12 animate-fade-in">
+                Why Choose CLUSTER FARMING?
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Feature Card 1 */}
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden text-center transform transition duration-300 hover:scale-105">
+                  <img src="images/analysis.jpg" alt="Data Analytics" className="w-full h-48 object-cover" />
+                  <div className="p-6">
+                    <h3 className="text-2xl font-semibold text-green-700 mb-3">Data-Driven Growth</h3>
+                    <p className="text-gray-600">
+                      With <span className="font-bold">Cluster Farming</span>, analyze water usage, forecast
+                      needs, and reduce costs using our powerful analytics dashboard.
+                    </p>
+                  </div>
+                </div>
+                {/* Feature Card 2 */}
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden text-center transform transition duration-300 hover:scale-105">
+                  <img
+                    src="https://images.unsplash.com/photo-1509395176047-4a66953fd231?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
+                    alt="Mobile Monitoring"
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="p-6">
+                    <h3 className="text-2xl font-semibold text-green-700 mb-3">Remote Control</h3>
+                    <p className="text-gray-600">
+                      Access <span className="font-bold">Cluster Farming</span> on any device to monitor
+                      sensors, valves, and payments in real-time, anywhere.
+                    </p>
+                  </div>
+                </div>
+                {/* Feature Card 3 */}
+                <div className="bg-white rounded-xl shadow-lg overflow-hidden text-center transform transition duration-300 hover:scale-105">
+                  <img
+                    src="https://images.unsplash.com/photo-1542831371-d531d36971e6?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60"
+                    alt="Sustainable Farming"
+                    className="w-full h-48 object-cover"
+                  />
+                  <div className="p-6">
+                    <h3 className="text-2xl font-semibold text-green-700 mb-3">Sustainable Future</h3>
+                    <p className="text-gray-600">
+                      <span className="font-bold">Cluster Farming</span> optimizes water use and minimizes
+                      waste with smart irrigation for eco-friendly farming.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-  <!-- FOOTER -->
-  <footer>
-    <p>&copy; 2025 ClusterFarm. All rights reserved.</p>
-  </footer>
+          {/* Footer */}
+          <footer className="bg-green-800 text-white text-center py-8">
+            <p className="text-lg">
+              &copy; 2025 <span className="font-playfair font-bold">CLUSTER FARMING</span>. All rights reserved.
+            </p>
+          </footer>
+        </div>
+      );
+    }
+
+    // Custom Tailwind CSS animations for dynamic effects
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes zoomIn {
+        from { transform: scale(0.8); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { transform: translateY(30px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-zoom-in {
+        animation: zoomIn 1s ease-out;
+      }
+      .animate-slide-up {
+        animation: slideUp 1s ease-out;
+      }
+      .animate-fade-in {
+        animation: fadeIn 1.2s ease-out;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Render the App component
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
 </body>
 </html>

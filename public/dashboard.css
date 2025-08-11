@@ -22,15 +22,13 @@ body {
   display: flex;
   align-items: center;
   background-color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   position: sticky;
   top: 0;
   z-index: 10;
   justify-content: space-between;
-  padding: 0 1rem; /* Add padding for spacing */
+  padding: 0 1rem;
 }
-
-/* Center-align the navigation links */
 .top-nav ul {
   display: flex;
   justify-content: center;
@@ -39,17 +37,34 @@ body {
   margin: 0;
   list-style: none;
 }
-
-/* Style for nav links */
-.top-nav a {
+.top-nav .nav-link {
+  position: relative;
   text-decoration: none;
   font-weight: 600;
   color: #0074D9;
   transition: color 0.2s ease;
 }
-.top-nav a:hover,
+.top-nav .nav-link:hover,
 .top-nav .nav-link:focus {
   color: #005bb5;
+}
+
+/* Active state underline */
+/* Remove the underline pseudo-element */
+.top-nav .nav-link.active::after { display: none; }
+
+/* Give the active link a colored background */
+.top-nav .nav-link.active {
+  background-color: #007bff;  /* your highlight color */
+  color: #fff;                /* ensure the text is readable */
+  border-radius: 4px;         /* soften the corners */
+  padding: 0.4rem 0.8rem;     /* add some breathing room */
+}
+
+/* On hover of an active link, keep the highlight */
+.top-nav .nav-link.active:hover {
+  background-color: #005bb5;
+  color: #fff;
 }
 
 /* Add spacing for the logout button */
@@ -353,6 +368,22 @@ body {
   box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
 }
 
+.datalist-input {
+  width: 100%;
+  max-width: 300px;       /* or whatever fits */
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+.datalist-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
 /* ====== button ====== */
 .btn-primary {
   display: inline-block;
@@ -368,6 +399,60 @@ body {
 .btn-primary:hover {
   background: #1e40af;
 }
+
+
+/* Container spacing */
+.zone-legend {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+/* Style the summary “header” */
+.zone-legend summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  background-color: #f0f4f8;
+  transition: background-color 0.2s;
+}
+.zone-legend summary:hover {
+  background-color: #e2e8f0;
+}
+
+/* Table basics */
+.zone-legend table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Header row */
+.zone-legend th {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  background-color: #edf2f7;
+  border-bottom: 1px solid #cbd5e0;
+}
+
+/* Data cells */
+.zone-legend td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Stripe effect for readability */
+.zone-legend tbody tr:nth-child(odd) {
+  background-color: #fafbfc;
+}
+
+/* Small tweaks for strong emphasis */
+.zone-legend td strong {
+  color: #1a202c;
+}
+
 
 /* ====== result panel ====== */
 .planner-result {
@@ -417,3 +502,144 @@ body {
 body:not(:target) #home-section {
   display: block;
 }
+
+
+
+.zone-legend table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Make only the tbody scrollable and show ~4 rows */
+.zone-legend tbody {
+  display: block;
+  max-height: calc(4 * 2.5rem); /* adjust 2.5rem to your row height */
+  overflow-y: auto;
+}
+
+/* Keep the header fixed and aligned */
+.zone-legend thead,
+.zone-legend tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* Optional: style scrollbars for WebKit browsers */
+.zone-legend tbody::-webkit-scrollbar {
+  width: 6px;
+}
+.zone-legend tbody::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+.zone-legend tbody::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Cell padding & borders */
+.zone-legend th,
+.zone-legend td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* container: horizontally aligns button + valve text */
+.plan-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+/* --- Shared button base --- */
+.btn-action {
+  flex: 1;
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+/* --- Cancel Plan --- */
+.btn-cancel {
+  background: #fff;
+  color: #c0392b;
+  border-color: #e0b4b4;
+}
+.btn-cancel:hover {
+  background: #fff6f6;
+  transform: translateY(-1px);
+}
+.btn-cancel:active { transform: translateY(0); }
+.btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- Close Valve --- */
+.btn-close {
+  background: #fff;
+  color: #b03a2e;
+  border-color: #e0b4b4;
+}
+.btn-close:hover {
+  background: #fff5f5;
+  transform: translateY(-1px);
+}
+.btn-close:active { transform: translateY(0); }
+
+/* --- Reopen Valve --- */
+.btn-open {
+  background: #fff;
+  color: #1e8449;
+  border-color: #a9dfbf;
+}
+.btn-open:hover {
+  background: #f6fff9;
+  transform: translateY(-1px);
+}
+.btn-open:active { transform: translateY(0); }
+
+/* --- Layout for the action buttons row --- */
+.action-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+/* --- Valve indicator layout --- */
+.valve-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #333;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+}
+
+/* --- Small pill status --- */
+.valve-status {
+  display: inline-block;
+  min-width: 56px;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #fff;
+  background: #999; /* default */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  font-size: 0.95rem;
+}
+
+/* --- Status colors --- */
+.valve-status.open { background: #27ae60; }    /* green */
+.valve-status.closed { background: #c0392b; }  /* red */
+.valve-status.manual { background: #f39c12; }  /* amber for manual override */

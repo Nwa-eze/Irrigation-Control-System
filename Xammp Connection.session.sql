@@ -1,1 +1,31 @@
-SELECT * FROM sensor_data;
+INSERT INTO crop_water_requirements (crop_name, region, growth_stage, water_l_per_m2_per_day, days)
+VALUES 
+  ('Faba Bean', 'Sub-humid', 'Initial', 2.75, 20),
+  ('Faba Bean', 'Sub-humid', 'Development', 7.27375, 30),
+  ('Faba Bean', 'Sub-humid', 'Mid-season', 7.27375, 35),
+  ('Faba Bean', 'Sub-humid', 'Late-season', 1.925, 15),
+  ('Faba Bean', 'Humid', 'Initial', 2, 15),
+  ('Faba Bean', 'Humid', 'Development', 5.29, 25),
+  ('Faba Bean', 'Humid', 'Mid-season', 5.29, 35),
+  ('Faba Bean', 'Humid', 'Late-season', 1.4, 15),
+  ('Grains(small)', 'Arid', 'Initial', 2.25, 25),
+  ('Grains(small)', 'Arid', 'Development', 8.25, 35),
+  ('Grains(small)', 'Arid', 'Mid-season', 8.25, 65),
+  ('Grains(small)', 'Arid', 'Late-season', 4.125, 40),
+  ('Grains(small)', 'Sub-humid', 'Initial', 1.65, 20),
+  ('Grains(small)', 'Sub-humid', 'Development', 6.05, 30),
+  ('Grains(small)', 'Sub-humid', 'Mid-season', 6.05, 60),
+  ('Grains(small)', 'Sub-humid', 'Late-season', 3.025, 45),
+  ('Grapes', 'Humid', 'Initial', 1.2, 20),
+  ('Grapes', 'Humid', 'Development', 3.4, 50),
+  ('Grapes', 'Humid', 'Mid-season', 3.4, 90),
+  ('Grapes', 'Humid', 'Late-season', 1.8, 20),
+  ('Grapes', 'Semi-arid', 'Initial', 1.95, 20),
+  ('Grapes', 'Semi-arid', 'Development', 5.525, 50),
+  ('Grapes', 'Semi-arid', 'Mid-season', 5.525, 75),
+  ('Grapes', 'Semi-arid', 'Late-season', 2.925, 60),
+  ('Grapes', 'Sub-humid', 'Initial', 1.65, 30),
+  ('Grapes', 'Sub-humid', 'Development', 4.675, 60),
+  ('Grapes', 'Sub-humid', 'Mid-season', 4.675, 40),
+  ('Grapes', 'Sub-humid', 'Late-season', 2.475, 80);
+  
