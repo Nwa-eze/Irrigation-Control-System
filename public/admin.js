@@ -1,4 +1,4 @@
-const BASE_URL = 'http://10.32.164.142:3005';
+
 
 // Handle admin login
 document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
@@ -7,7 +7,7 @@ document.getElementById('admin-login-form').addEventListener('submit', async (e)
   const password = document.getElementById('admin-password').value;
 
   try {
-    const resp = await fetch(`${BASE_URL}/admin/login`, {
+    const resp = await fetch('/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
@@ -41,7 +41,7 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 async function loadUsers() {
   try {
     const token = localStorage.getItem('adminToken');
-    const resp = await fetch(`${BASE_URL}/admin/users`, {
+    const resp = await fetch('/admin/users', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (resp.ok) {
@@ -69,7 +69,7 @@ async function loadUserDetails(e) {
 
   try {
     const token = localStorage.getItem('adminToken');
-    const resp = await fetch(`${BASE_URL}/admin/user/${userId}`, {
+    const resp = await fetch(`/admin/user/${userId}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (resp.ok) {
