@@ -14,7 +14,7 @@ const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 
 const app = express();
 app.use(cors({
-  origin: 'http://10.32.164.142:3005', // Your frontend URL
+  origin: 'http://127.0.0.1:3005', // Your frontend URL
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
