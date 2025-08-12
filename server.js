@@ -188,7 +188,7 @@ app.post("/login", async (req, res) => {
   try {
     // Pull id, name, location, farm_id, matric_number
     const [rows] = await pool.execute(
-      `SELECT id, username, location, farm_id
+      `SELECT id, username, location, farm_id, name
          FROM users
         WHERE username = ? AND password = ?
         LIMIT 1`,
@@ -204,7 +204,7 @@ app.post("/login", async (req, res) => {
     // On success, send back JSON (status defaults to 200)
     res.json({
       userId:        user.id,
-      username:      user.username,
+      username:      user.name,
       location:      user.location,
       farm_id:       user.farm_id,
     });
