@@ -11,6 +11,7 @@ const axios = require("axios");
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 const crypto = require('crypto');
+const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:3005';
 
 
 const app = express();
@@ -25,13 +26,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Create a MySQL connection pool (adjust with your credentials)
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'your_database_name',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
 });
 
 
@@ -436,29 +437,33 @@ app.post('/receive_data', async (req, res) => {
 
 
 app.post("/create-postpaid-session", async (req, res) => {
-  const { amount, userId } = req.body; 
+  const { amount, userId } = req.body;
   try {
+    if (!amount || !userId) {
+      return res.status(400).json({ error: 'Missing required fields: amount or userId' });
+    }
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: 'Postpaid Water Invoice Payment',
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Postpaid Water Invoice Payment',
+            },
+            unit_amount: Math.round(amount * 100),
           },
-          unit_amount: amount * 100,
+          quantity: 1,
         },
-        quantity: 1,
-      }],
+      ],
       mode: 'payment',
-      success_url: `/dashboard.html?payment=success&type=postpaid&amount=${amount}&userId=${userId}`,
-      cancel_url: '/dashboard.html?payment=cancel',
+      success_url: `${BASE_URL}/dashboard.html?payment=success&type=postpaid&amount=${encodeURIComponent(amount)}&userId=${encodeURIComponent(userId)}`,
+      cancel_url: `${BASE_URL}/dashboard.html?payment=cancel`,
       metadata: {
         payment_type: 'postpaid',
-        user_id: userId
-      }
+        user_id: userId,
+      },
     });
-
     res.json({ id: session.id });
   } catch (error) {
     console.error("Error creating postpaid session:", error);
@@ -508,27 +513,28 @@ app.get('/api/paystack/callback', async (req, res) => {
 // --------------------
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { amount } = req.body; // amount in naira (or cents, depending on your front-end)
+    const { amount, userId, type } = req.body; // Include userId and type for consistency
+    if (!amount || !userId || !type) {
+      return res.status(400).json({ error: 'Missing required fields: amount, userId, or type' });
+    }
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
           price_data: {
-            currency: 'usd', // or 'ngn', whichever you prefer
+            currency: 'usd', // or 'ngn' if using NGN
             product_data: {
               name: 'Prepaid Water Payment',
             },
-            unit_amount: amount * 100, // amount in cents (if USD), or *100 if NGN in kobo
+            unit_amount: Math.round(amount * 100), // Ensure cents/kobo
           },
           quantity: 1,
         },
       ],
       mode: 'payment',
-      // ←– note the addition of `type=prepaid`
-      success_url:
-        '/dashboard.html?payment=success&type=prepaid&amount=' +
-        amount,
-      cancel_url: '/cancel.html',
+      success_url: `${BASE_URL}/dashboard.html?payment=success&type=prepaid&amount=${encodeURIComponent(amount)}&userId=${encodeURIComponent(userId)}`,
+      cancel_url: `${BASE_URL}/cancel.html`,
+      metadata: { user_id: userId, payment_type: type },
     });
     res.json({ id: session.id });
   } catch (error) {
