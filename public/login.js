@@ -18,7 +18,7 @@ async function login() {
     console.log(data);
     // On success, store into localStorage
     localStorage.setItem("user_id",        data.userId);
-    localStorage.setItem("user_name",      data.username);
+    localStorage.setItem("user_name",      data.name);  // Changed from data.username to data.name
     localStorage.setItem("user_location",  data.location);
     localStorage.setItem("farm_id",        data.farm_id);
     localStorage.setItem("matric_number",  data.matric_number);

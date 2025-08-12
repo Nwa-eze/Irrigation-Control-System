@@ -11,12 +11,12 @@ const axios = require("axios");
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 const crypto = require('crypto');
-const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:3005';
+const BASE_URL = process.env.BASE_URL || 'http://10.32.164.142:3005';
 
 
 const app = express();
 app.use(cors({
-  origin: 'http://127.0.0.1:3005', // Your frontend URL
+  origin: 'http://10.32.164.142:3005', // Your frontend URL
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
@@ -190,7 +190,7 @@ app.post("/login", async (req, res) => {
   try {
     // Pull id, name, location, farm_id, matric_number
     const [rows] = await pool.execute(
-      `SELECT id, username, location, farm_id
+      `SELECT id, username, location, farm_id, name
          FROM users
         WHERE username = ? AND password = ?
         LIMIT 1`,
@@ -209,6 +209,7 @@ app.post("/login", async (req, res) => {
       username:      user.username,
       location:      user.location,
       farm_id:       user.farm_id,
+      name:          user.name,
     });
 
   } catch (error) {
@@ -475,36 +476,54 @@ app.post("/create-postpaid-session", async (req, res) => {
 app.post('/api/paystack/initialize', async (req, res) => {
   const { amount, userId, type } = req.body;
   try {
+    const [profileRows] = await pool.execute(
+      `SELECT email FROM user_profiles WHERE user_id = ? LIMIT 1`,
+      [userId]
+    );
+    const email = profileRows[0]?.email || 'system@domain.com';
+
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
-        email: 'hellozed10@gmail.com',    // hardcode or pull from users table
-        amount: Math.round(amount),                // in kobo
+        email,    
+        amount: Math.round(amount), 
         metadata: { userId, type },
-        callback_url: `/api/paystack/callback`
+        callback_url: `${BASE_URL}/api/paystack/callback`
       },
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
     );
+    console.log('Paystack postpaid init response:', response.data);
     res.json(response.data.data);
   } catch (err) {
-    console.error('Paystack init error', err.response?.data || err);
+    console.error('Paystack postpaid init error', err.response?.data || err);
     res.status(500).json({ error: 'Paystack initialize failed' });
   }
 });
 
-// Paystack callback verification
+// Paystack postpaid callback verification
 app.get('/api/paystack/callback', async (req, res) => {
   const reference = req.query.reference;
+  if (!reference) {
+    console.error('Paystack postpaid callback error: Missing reference');
+    return res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
+  }
   try {
     const response = await axios.get(
       `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
       { headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}` } }
     );
-    // you can check response.data.data.status === 'success'
-    res.redirect(`/dashboard.html?payment=success&type=postpaid&amount=${response.data.data.amount/100}`);
+    const { status, amount, metadata } = response.data.data;
+    console.log('Paystack postpaid callback:', { status, amount, metadata });
+    if (status === 'success') {
+      res.redirect(
+        `${BASE_URL}/dashboard.html?payment=success&type=${metadata.type}&amount=${amount / 100}&userId=${metadata.userId}`
+      );
+    } else {
+      res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
+    }
   } catch (err) {
-    console.error('Paystack verify error', err.response?.data || err);
-    res.redirect(`/dashboard.html?payment=failed`);
+    console.error('Paystack postpaid verify error', err.response?.data || err);
+    res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
   }
 });
 
@@ -546,15 +565,21 @@ app.post("/create-checkout-session", async (req, res) => {
 
 // Initialize a Paystack transaction
 app.post("/paystack/initialize", async (req, res) => {
-  const { email, amount, metadata } = req.body;
+  const { amount, userId, type } = req.body;
   try {
+    const [profileRows] = await pool.execute(
+      `SELECT email FROM user_profiles WHERE user_id = ? LIMIT 1`,
+      [userId]
+    );
+    const email = profileRows[0]?.email || 'system@domain.com';
+
     const response = await axios.post(
       `${PAYSTACK_BASE_URL}/transaction/initialize`,
       {
         email,
-        amount,
-        metadata,
-        callback_url: `/paystack/callback`,
+        amount: Math.round(amount), 
+        metadata: { userId, type },
+        callback_url: `${BASE_URL}/paystack/callback`,
       },
       {
         headers: {
@@ -562,19 +587,23 @@ app.post("/paystack/initialize", async (req, res) => {
         },
       }
     );
+    console.log('Paystack prepaid init response:', response.data);
     res.json({
       authorization_url: response.data.data.authorization_url,
     });
   } catch (err) {
-    console.error("Paystack init error:", err.response?.data || err);
-    res.status(500).send("Paystack initialization failed");
+    console.error("Paystack prepaid init error:", err.response?.data || err);
+    res.status(500).json({ error: "Paystack initialization failed" });
   }
 });
 
 app.get("/paystack/callback", async (req, res) => {
   const reference = req.query.reference;
+  if (!reference) {
+    console.error("Paystack prepaid callback error: Missing reference");
+    return res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
+  }
   try {
-    // verify transaction
     const verification = await axios.get(
       `${PAYSTACK_BASE_URL}/transaction/verify/${reference}`,
       {
@@ -584,17 +613,17 @@ app.get("/paystack/callback", async (req, res) => {
       }
     );
     const { status, amount, metadata } = verification.data.data;
+    console.log('Paystack prepaid callback:', { status, amount, metadata });
     if (status === "success") {
-      // → Send user back to dashboard with both `type` and `amount` in query
       res.redirect(
-        `/dashboard.html?payment=success&type=${metadata.type}&amount=${amount / 100}`
+        `${BASE_URL}/dashboard.html?payment=success&type=${metadata.type}&amount=${amount / 100}&userId=${metadata.userId}`
       );
     } else {
-      res.redirect(`/dashboard.html?payment=failed`);
+      res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
     }
   } catch (err) {
-    console.error("Paystack verify error:", err.response?.data || err);
-    res.redirect(`/dashboard.html?payment=failed`);
+    console.error("Paystack prepaid verify error:", err.response?.data || err);
+    res.redirect(`${BASE_URL}/dashboard.html?payment=failed`);
   }
 });
 
@@ -709,14 +738,6 @@ app.get('/valve_states', async (req, res) => {
           console.error('[planAllowsOpen] failed to mark plan completed', e);
         }
 
-        // clear manual open flag so MCU receives closed on next poll
-        try {
-          await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [userId]);
-          console.log(`[planAllowsOpen] cleared valve_state.is_open for user ${userId}`);
-        } catch (e) {
-          console.error('[planAllowsOpen] failed to clear valve_state.is_open', e);
-        }
-
         return { allowsOpen: false, reason, consumedToday, perDay, daysElapsed, duration };
       }
 
@@ -729,77 +750,59 @@ app.get('/valve_states', async (req, res) => {
       const uid = r.user_id;
       const balance = parseFloat(r.available_balance || 0);
 
-      // 1) balance zero -> closed, clear manual flag
-      if (balance <= 0) {
-        try {
-          await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
-          console.log(`[valve_states] user ${uid} balance<=0: cleared manual flag`);
-        } catch (e) {
-          console.error(`[valve_states] failed clearing manual for user ${uid}`, e);
-        }
-        result[`user${uid}_state`] = false;
-        result[`user${uid}_reason`] = 'no_balance';
-        result[`user${uid}_consumedToday`] = null;
-        result[`user${uid}_perDayTarget`] = null;
-        result[`user${uid}_daysElapsed`] = null;
-        result[`user${uid}_duration`] = null;
-        continue;
-      }
-
-      // 2) run plan logic (may mark completed & clear manual flag)
-      let planInfo;
-      try {
-        planInfo = await planAllowsOpen(uid);
-      } catch (e) {
-        console.error(`[valve_states] planAllowsOpen failed for ${uid}`, e);
-        planInfo = { allowsOpen: false, reason: 'plan_check_error' };
-      }
-
-      // re-read manual flag after plan check (in case planAllowsOpen cleared it)
+      // Fetch manual flag (now tri-state: 1, 0, null)
       const [[vrow]] = await pool.execute(`SELECT is_open FROM valve_state WHERE user_id = ? LIMIT 1`, [uid]);
-      const manualOpenNow = !!vrow?.is_open;
-      console.log(`[valve_states] user ${uid} manualOpenNow:`, manualOpenNow);
+      const isOpenFlag = vrow ? vrow.is_open : null;  // null for auto
+      let manualOpenNow = isOpenFlag === 1;  // For logging/compat
+      console.log(`[valve_states] user ${uid} isOpenFlag:`, isOpenFlag);
 
-      // If an active plan was found, follow plan decision
-      if (planInfo && planInfo.reason !== 'no_plan') {
-        if (planInfo.allowsOpen) {
-          result[`user${uid}_state`] = true;
-          result[`user${uid}_reason`] = planInfo.reason || 'plan_ok';
-        } else {
-          // plan blocks open -> ensure DB manual flag cleared
-          if (manualOpenNow) {
-            try {
-              await pool.execute(`UPDATE valve_state SET is_open = 0 WHERE user_id = ?`, [uid]);
-              console.log(`[valve_states] plan blocked -> cleared manual for ${uid}`);
-            } catch (e) {
-              console.error(`[valve_states] failed clear manual (plan blocked) for ${uid}`, e);
-            }
-          }
-          result[`user${uid}_state`] = false;
-          result[`user${uid}_reason`] = planInfo.reason || 'plan_block';
+      let state = false;
+      let reason = 'unknown';
+      let planInfo = null;  // Declare here to avoid ReferenceError
+
+      if (balance <= 0) {
+        state = false;
+        reason = 'no_balance';
+        // Reset any force-open to auto (null)
+        if (isOpenFlag === 1) {
+          await pool.execute(`UPDATE valve_state SET is_open = NULL WHERE user_id = ?`, [uid]);
+          console.log(`[valve_states] user ${uid} balance<=0: reset force-open to auto`);
         }
-
-        // debug numbers
-        result[`user${uid}_consumedToday`] = planInfo?.consumedToday ?? null;
-        result[`user${uid}_perDayTarget`]  = planInfo?.perDay ?? null;
-        result[`user${uid}_daysElapsed`]   = planInfo?.daysElapsed ?? null;
-        result[`user${uid}_duration`]      = planInfo?.duration ?? null;
-        continue;
-      }
-
-      // 3) no active plan: honor manual flag (since balance > 0)
-      if (manualOpenNow) {
-        result[`user${uid}_state`] = true;
-        result[`user${uid}_reason`] = 'manual_override';
       } else {
-        result[`user${uid}_state`] = false;
-        result[`user${uid}_reason`] = 'no_plan';
+        // balance > 0
+        if (isOpenFlag === 0) {
+          state = false;
+          reason = 'manual_close';
+        } else if (isOpenFlag === 1) {
+          state = true;
+          reason = 'manual_override';
+        } else {
+          // auto (null)
+          try {
+            planInfo = await planAllowsOpen(uid);
+          } catch (e) {
+            console.error(`[valve_states] planAllowsOpen failed for ${uid}`, e);
+            planInfo = { allowsOpen: false, reason: 'plan_check_error' };
+          }
+
+          if (planInfo.reason !== 'no_plan') {
+            state = planInfo.allowsOpen;
+            reason = state ? 'plan_ok' : planInfo.reason;
+          } else {
+            state = true;
+            reason = 'balance_ok';
+          }
+        }
       }
-      result[`user${uid}_consumedToday`] = null;
-      result[`user${uid}_perDayTarget`]  = null;
-      result[`user${uid}_daysElapsed`]   = null;
-      result[`user${uid}_duration`]      = null;
+
+      result[`user${uid}_state`] = state;
+      result[`user${uid}_reason`] = reason;
+      result[`user${uid}_consumedToday`] = planInfo?.consumedToday ?? null;
+      result[`user${uid}_perDayTarget`] = planInfo?.perDay ?? null;
+      result[`user${uid}_daysElapsed`] = planInfo?.daysElapsed ?? null;
+      result[`user${uid}_duration`] = planInfo?.duration ?? null;
     }
+
 
     console.log('[/valve_states] result:', result);
     return res.json(result);
@@ -863,8 +866,7 @@ app.post('/api/plans/calculate', async (req, res) => {
 
   try {
     const [[row]] = await pool.execute(
-      `SELECT water_l_per_m2_per_day AS rate,
-              days AS duration
+      `SELECT water_l_per_m2_per_day AS rate, days AS duration
          FROM crop_water_requirements
         WHERE crop_name    = ?
           AND region       = ?
@@ -981,6 +983,8 @@ app.post('/api/plans/start', async (req, res) => {
       // commit transaction
       await conn.commit();
 
+      const planId = insPlan.insertId;
+
       // fetch fresh balance (outside transaction or using conn)
       const [[{ available_balance }]] = await pool.execute(
         `SELECT available_balance FROM users WHERE id = ?`,
@@ -988,7 +992,7 @@ app.post('/api/plans/start', async (req, res) => {
       );
       
       try {
-        const today = new Date().toISOString().slice(0,10);
+        const todayDateString = new Date().toISOString().slice(0,10);
         // ensure the plan-day row exists (0 consumed so far) — uses consumed_liters column
         await pool.execute(
          `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters)
@@ -1058,13 +1062,14 @@ app.get('/api/device/state', async (req, res) => {
         [userId]
       );
       const avail = parseFloat(available_balance) || 0;
-      const manualOverride = !!vsRow?.is_open;
-      const valveOpen = manualOverride && avail > 0;
+      const isOpenFlag = vsRow ? vsRow.is_open : null;
+      const manualOverride = isOpenFlag === 1;
+      const valveOpen = (avail > 0) && (isOpenFlag !== 0);  // Auto open if balance >0 and not force-closed
 
       return res.json({
         plan: null,
         valveOpen: !!valveOpen,
-        valveReason: valveOpen ? 'manual_override' : (avail <= 0 ? 'no_balance' : 'idle'),
+        valveReason: valveOpen ? (manualOverride ? 'manual_override' : 'balance_ok') : (avail <= 0 ? 'no_balance' : 'manual_close'),
         manualOverride,
         availableBalance: Number(avail.toFixed(2))
       });
@@ -1077,12 +1082,13 @@ app.get('/api/device/state', async (req, res) => {
     );
     const currVol = parseFloat(currVolRaw) || 0;
 
-    // 3) manual override flag (make mutable)
+    // 3) manual override flag (tri-state)
     const [[vsRow2]] = await pool.execute(
       `SELECT is_open FROM valve_state WHERE user_id=? LIMIT 1`,
       [userId]
     );
-    let manualOverride = !!vsRow2?.is_open;
+    const isOpenFlag = vsRow2 ? vsRow2.is_open : null;
+    const manualOverride = isOpenFlag === 1;  // Only true for force-open
 
     // 4) available balance
     const [[{ available_balance = 0 }]] = await pool.execute(
@@ -1147,19 +1153,20 @@ app.get('/api/device/state', async (req, res) => {
     if (availBal <= 0) {
       valveOpen = false;
       valveReason = 'no_balance';
-    } else if (manualOverride) {
-      // manual override always allows open (user requested)
+    } else if (isOpenFlag === 0) {
+      valveOpen = false;
+      valveReason = 'manual_close';
+    } else if (isOpenFlag === 1) {
       valveOpen = true;
       valveReason = 'manual_override';
-    } else if (exceedDays) {
-      valveOpen = false;
-      valveReason = 'duration_complete';
-    } else if (hitTodayLimit) {
-      valveOpen = false;
-      valveReason = 'daily_limit';
     } else {
-      valveOpen = true;
-      valveReason = 'ok';
+      // auto
+      valveOpen = hitTodayLimit || exceedDays ? false : true;
+      valveReason = valveOpen ? 'plan_ok' : (exceedDays ? 'duration_complete' : 'daily_limit');
+      if (plan === null) {
+        valveOpen = true;
+        valveReason = 'balance_ok';
+      }
     }
 
     // 7b) If the system closed the valve (not manual) and there is a manual flag set in DB,
@@ -1221,21 +1228,38 @@ app.get('/api/device/state', async (req, res) => {
 
 
 // Cancel plan route
-app.post("/plans/cancel", async (req, res) => {
-    const { planId } = req.body;
+app.post("/api/plans/cancel", async (req, res) => {
+  const { planId } = req.body;
+  if (!planId) return res.status(400).json({ error: 'Missing planId' });
 
+  try {
+    // Fetch user_id from plan (for valve update)
+    const [[plan]] = await pool.execute(
+      `SELECT user_id FROM user_plans WHERE id = ?`,
+      [planId]
+    );
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+    // Transaction: delete days, delete plan, close valve
+    const conn = await pool.getConnection();
     try {
-        // Update DB so that the plan status becomes cancelled
-        await pool.query(
-            "UPDATE plans SET status = 'cancelled', end_time = NOW() WHERE id = ?",
-            [planId]
-        );
-
-        res.json({ success: true, message: "Plan cancelled successfully." });
-    } catch (error) {
-        console.error("Error cancelling plan:", error);
-        res.status(500).json({ success: false, message: "Error cancelling plan." });
+      await conn.beginTransaction();
+      await conn.execute('DELETE FROM user_plan_days WHERE plan_id = ?', [planId]);
+      await conn.execute('DELETE FROM user_plans WHERE id = ?', [planId]);
+      await conn.execute('UPDATE valve_state SET is_open = 0 WHERE user_id = ?', [plan.user_id]);
+      await conn.commit();
+      res.json({ success: true, message: "Plan totally removed." });
+    } catch (errorTx) {
+      await conn.rollback();
+      console.error("Error cancelling plan (tx):", errorTx);
+      res.status(500).json({ success: false, message: "Error cancelling plan." });
+    } finally {
+      conn.release();
     }
+  } catch (error) {
+    console.error("Error cancelling plan:", error);
+    res.status(500).json({ success: false, message: "Error cancelling plan." });
+  }
 });
 
 

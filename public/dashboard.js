@@ -258,9 +258,9 @@ async function startPaystackPayment() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        email: "system@domain.com",        // or grab real user email if you prefer
         amount: Math.round(amount * 100),  // kobo
-        metadata: { userId, type: "prepaid" }
+        userId,
+        type: "prepaid"
       })
     });
     const { authorization_url } = await resp.json();
@@ -360,7 +360,7 @@ function showDeductionAlert(amount) {
 // 4) UPDATE “HOME” INFO
 // ------------------------
 function updateHomeInfo() {
-  const userNameSpan = document.getElementById("user-name");
+  const userNameSpan = document.getElementById("name");
   const userLocationSpan = document.getElementById("user-location");
   const farmIdSpan = document.getElementById("farm-id");
   if (!userNameSpan || !userLocationSpan || !farmIdSpan) return;
@@ -504,8 +504,7 @@ async function startPostpaidPaymentPaystack() {
       body: JSON.stringify({
         amount: Math.round(owedAmount * 100),
         userId,
-        type: "postpaid",
-        email: localStorage.getItem("user_email") || "system@domain.com"
+        type: "postpaid"
       })
     });
     const data = await resp.json();
@@ -579,17 +578,15 @@ document.querySelectorAll('.top-nav .nav-link').forEach(link => {
     document.querySelectorAll('.top-nav .nav-link').forEach(l => l.classList.remove('active'));
     link.classList.add('active');
   });
-
-  if (window.location.hash === `#${targetId}`) {
-    link.classList.add('active');
-    showOnlySection(targetId);
-  }
 });
 
-if (!window.location.hash) {
-  const first = document.querySelector('.top-nav .nav-link');
-  first.classList.add('active');
-  showOnlySection(first.dataset.target);
+const initialHash = window.location.hash.substring(1);
+if (["home-section", "analytics-section", "payments-section", "irrigation-planner"].includes(initialHash)) {
+  showOnlySection(initialHash);
+  document.querySelector(`.nav-link[data-target="${initialHash}"]`)?.classList.add('active');
+} else {
+  showOnlySection("home-section");
+  document.querySelector('.nav-link[data-target="home-section"]')?.classList.add('active');
 }
 
 
@@ -642,7 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---------- Attach payment & postpaid buttons (if present) ----------
   safe.on('stripe-pay-btn', 'click', startStripePayment);
-  safe.on('paystack-pay-btn', 'click', startPaystackPayment);
+  safe.on('start-paystack-btn', 'click', startPaystackPayment);
   safe.on('add-postpaid-btn', 'click', handleAddPostpaid);
   safe.on('stripe-postpaid-btn', 'click', startPostpaidPayment);
   safe.on('paystack-postpaid-btn', 'click', startPostpaidPaymentPaystack);
@@ -905,7 +902,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const resp = await fetch('/api/plans/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({ planId: lastPlan.id })
       });
 
       const data = await resp.json().catch(() => null);
@@ -1034,6 +1031,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
+     
       // Do NOT stop polling here — keep polling so user can reopen the valve after completion
       if (lastPlan && lastPlan.status === 'completed') {
         console.log('Plan completed: UI persisted but polling continues so manual actions are available.');
@@ -1114,10 +1112,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // show summary (updatePlanUI will also be called immediately by startPollingDeviceState)
         safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
         safe.el('planner-result') && (safe.el('planner-result').hidden = true);
-        safe.el('ps-daily-target') && (safe.el('ps-daily-target').textContent = (lastPlan.perDayTarget || 0).toFixed(2));
-        safe.el('ps-total-target') && (safe.el('ps-total-target').textContent = (lastPlan.totalTarget || 0).toFixed(2));
-        safe.el('plan-status') && (safe.el('plan-status').textContent = lastPlan.status);
-
         startPollingDeviceState(userId, 10000);
         return;
       }
@@ -1162,3 +1156,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 }); // end DOMContentLoaded
+
+

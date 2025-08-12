@@ -76,7 +76,7 @@
       <p>
         <strong>Name:</strong> <span id="analytics-name">—</span>
         &nbsp;|&nbsp;
-        <strong>Farm ID:</strong> <span id="analytics-farm-id">—</span>
+        <strong>Farm&nbsp;ID:</strong> <span id="analytics-farm-id">—</span>
       </p>
     </div>
 
@@ -108,7 +108,7 @@
 
       <div class="payment-buttons">
         <button id="stripe-pay-btn" class="btn btn-stripe">Pay with Stripe</button>
-        <button id="paystack-pay-btn" class="btn btn-paystack">Pay with Paystack</button>
+        <button id="start-paystack-btn" class="btn btn-paystack">Pay with Paystack</button>
       </div>
     </div>
 
@@ -261,7 +261,7 @@
 
       <div class="form-row">
         <label for="area">Field Area (m²)</label>
-        <input type="number" id="area" name="area" min="1" placeholder="e.g. 500" required>
+        <input type="number" id="area" name="area" min="1" placeholder="e.g. 500" required>
       </div>
 
       <div class="form-row">
@@ -285,25 +285,34 @@
         <p><strong>Flat service fee:</strong> ₦<span id="flat-fee">—</span></p>
         <!-- Pay button injected here -->
       </div>
-
-      <div id="plan-summary" class="plan-summary" hidden>
-        <p><strong>Duration:</strong> <span id="plan-duration-days">—</span> day(s)</p>
-        <p><strong>Days elapsed:</strong> <span id="plan-days-elapsed">—</span></p>
-        <p><strong>Days left:</strong> <span id="plan-days-left">—</span></p>
-        <p><strong>Consumed today:</strong> <span id="plan-consumed-today">—</span> L</p>
-        <p><strong>Remaining today:</strong> <span id="plan-remaining-today">—</span> L</p>
-        <p><strong>Plan end date:</strong> <span id="plan-end-date">—</span></p>
-
-        <div id="plan-actions" class="plan-actions">
-          <button id="btn-manual-open" class="btn-action btn-open" onclick="handleManualOpen()">Reopen Valve</button>
-          <button id="btn-cancel-plan" class="btn-action btn-cancel" onclick="handleCancelPlan()">Cancel Plan</button>
-          <button id="btn-manual-close" class="btn-action btn-close" onclick="handleManualClose()">Close Valve</button>
-
-          <div id="valve-indicator" class="valve-indicator">
-            Valve: <span id="valve-status" class="valve-status">—</span>
-          </div>
-        </div>
     </form>
+
+    <div id="plan-summary" class="plan-summary" hidden>
+      <span id="ps-plan-id" hidden></span>
+      <p><strong>Duration:</strong> <span id="plan-duration-days">—</span> day(s)</p>
+      <p><strong>Days elapsed:</strong> <span id="plan-days-elapsed">—</span></p>
+      <p><strong>Days left:</strong> <span id="plan-days-left">—</span></p>
+      <p><strong>Consumed today:</strong> <span id="plan-consumed-today">—</span> L</p>
+      <p><strong>Remaining today:</strong> <span id="plan-remaining-today">—</span> L</p>
+      <p><strong>Plan end date:</strong> <span id="plan-end-date">—</span></p>
+      <p><strong>Daily Target:</strong> <span id="ps-daily-target">—</span> L</p>
+      <p><strong>Total Target:</strong> <span id="ps-total-target">—</span> L</p>
+      <p><strong>Status:</strong> <span id="plan-status">—</span></p>
+
+      <div id="plan-actions" class="plan-actions">
+        <button id="btn-manual-open" class="btn-action btn-open">Reopen Valve</button>
+        <button id="cancelPlanBtn" class="btn-action btn-cancel">Cancel Plan</button>
+        <button id="btn-manual-close" class="btn-action btn-close">Close Valve</button>
+
+        <div id="valve-indicator" class="valve-indicator">
+          Valve: <span id="valve-status" class="valve-status closed">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="completed-plan-details" class="completed-plan-details" hidden>
+      <!-- Populated dynamically on completion -->
+    </div>
   </section>
 </body>
 </html>
