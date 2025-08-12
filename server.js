@@ -182,8 +182,6 @@ app.post('/register', async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
-  console.log("Login attempt for user:", username);
-  console.log("Password:", password);
 
   try {
     // Pull id, name, location, farm_id, matric_number
@@ -201,10 +199,11 @@ app.post("/login", async (req, res) => {
 
     const user = rows[0];
     console.log(user);
+    console.log('above');
     // On success, send back JSON (status defaults to 200)
     res.json({
       userId:        user.id,
-      username:      user.name,
+      name:          user.name,
       location:      user.location,
       farm_id:       user.farm_id,
     });
