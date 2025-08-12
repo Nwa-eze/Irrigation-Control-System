@@ -6,10 +6,11 @@ const mysql = require('mysql2/promise'); // Promise-based MySQL client
 const path = require('path');
 const csv = require('csv-express');
 require('dotenv').config();   // ← this loads .env into process.env
-const stripe = require('stripe')('pk_test_51Qo6ArP6Eq8DZLKp1Jloq3I58N1MA1slOXKB8hK7IpgpdljVj33eVuOuc8MIYxdkilkQOtkLZgnR99oIy2W6bFSt00xSCHSgrM'); // Stripe dependency
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const axios = require("axios");
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
+const crypto = require('crypto');
 
 
 const app = express();
@@ -589,6 +590,30 @@ app.get("/paystack/callback", async (req, res) => {
     console.error("Paystack verify error:", err.response?.data || err);
     res.redirect(`/dashboard.html?payment=failed`);
   }
+});
+
+app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const { user_id, payment_type } = session.metadata;
+    const amount = session.amount_total / 100; // Convert cents to dollars
+
+    // Update your database or perform actions (e.g., mark payment as complete)
+    console.log(`Payment successful for user ${user_id}, type: ${payment_type}, amount: ${amount}`);
+    // Example: Update user balance or record transaction
+  }
+
+  res.json({ received: true });
 });
 
 
