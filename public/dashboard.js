@@ -150,8 +150,8 @@ function createChart(data) {
       datasets: [{
         label: 'Volume (L)',
         data: data.volumes,
-        borderColor: '#36A2EB',
-        backgroundColor: 'rgba(54,162,235,0.1)',
+        borderColor: '#1e7a3a',
+        backgroundColor: 'rgba(25, 143, 78, 0.1)',
         fill: true,
         tension: 0.4
       }]
@@ -770,54 +770,80 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   // --- START PLAN ---
+  
+  // ----------------- UPDATED / REPLACEMENT SNIPPETS -----------------
+
+  // Call this to format numbers safely (returns string)
+  function fmtNumber(n, digits = 2) {
+    if (n === null || typeof n === 'undefined' || !Number.isFinite(Number(n))) return '—';
+    return Number(n).toFixed(digits);
+  }
+
+  // --- START PLAN (improved) ---
   async function startPlan() {
     console.log('▶️ startPlan invoked, currentCalc =', currentCalc);
     if (!currentCalc) return alert('Please calculate first.');
 
     const { crop, region, stage, area } = currentCalc;
-    if (!userId) return alert('User not logged in.');
+    if (!userId && !localStorage.getItem('user_id')) return alert('User not logged in.');
+    const uid = userId || localStorage.getItem('user_id');
 
     try {
       const resp = await fetch('/api/plans/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, crop, region, stage, area }),
+        body: JSON.stringify({ userId: uid, crop, region, stage, area }),
         cache: 'no-store'
       });
 
-      // defensive parse
       const data = await resp.json().catch(() => null);
       console.log('⬅️ startPlan response:', resp.status, data);
 
       if (!resp.ok) return alert(data?.error || 'Could not start plan.');
 
+      // update local stored balance if backend returned it
       if (typeof data.newBalance !== 'undefined') {
-        // store as string — preserve decimals if backend returned them
-        localStorage.setItem('available_balance_' + userId, String(data.newBalance));
-        if (typeof updateBalanceInfo === 'function') updateBalanceInfo(userId);
+        localStorage.setItem('available_balance_' + uid, String(data.newBalance));
+        if (typeof updateBalanceInfo === 'function') updateBalanceInfo(uid);
       }
 
-      showPlanSummary({
-        planId: data.planId,
-        dailyTarget: Number(data.dailyVolume || data.dailyTarget || 0),
+      // Immediately set lastPlan so UI shows the plan without waiting for next poll
+      lastPlan = {
+        id: data.planId,
+        perDayTarget: Number(data.dailyVolume || data.dailyTarget || 0),
         totalTarget: Number(data.totalTarget || 0),
-        duration: parseInt(data.durationDays || data.duration || 0, 10)
+        durationDays: parseInt(data.durationDays || data.duration || 0, 10),
+        daysElapsed: 0,
+        daysLeft: parseInt(data.durationDays || data.duration || 0, 10),
+        consumedToday: 0,
+        remainingToday: Number(data.dailyVolume || data.dailyTarget || 0),
+        endDate: '-', // will be updated by polling/device-state
+        status: 'active'
+      };
+
+      // render plan summary immediately
+      showPlanSummary({
+        planId: lastPlan.id,
+        dailyTarget: lastPlan.perDayTarget,
+        totalTarget: lastPlan.totalTarget,
+        duration: lastPlan.durationDays
       });
+      setPlanStatusText('active');
 
       const startBtn = safe.el('btn-start-plan');
       if (startBtn) { startBtn.disabled = true; startBtn.style.display = 'none'; }
 
-      alert(`Plan started! Target ${data.totalTarget} L over ${data.durationDays} day(s).`);
+      alert(`Plan started! Target ${lastPlan.totalTarget} L over ${lastPlan.durationDays} day(s).`);
 
-      // start polling
-      startPollingDeviceState(userId, 10000);
+      // start polling device state (clears previous interval if present)
+      startPollingDeviceState(uid, 10000);
     } catch (err) {
       console.error('startPlan error', err);
       alert('Network error when starting plan.');
     }
   }
 
-  // --- SHOW PLAN SUMMARY (UI) ---
+  // --- showPlanSummary (unchanged except tidy) ---
   function showPlanSummary({ planId, dailyTarget, totalTarget, duration }) {
     function set(id, value, digits = 2) {
       const el = safe.el(id); if (!el) return;
@@ -833,7 +859,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     safe.el('planner-result') && (safe.el('planner-result').hidden = true);
   }
 
-  // --- plan status badge helper ---
+  // --- setPlanStatusText helper (used) ---
   function setPlanStatusText(status) {
     const el = safe.el('plan-status');
     if (!el) return;
@@ -849,17 +875,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- MANUAL OPEN (web button) ---
   async function handleManualOpen() {
-    if (!userId) return alert('User not identified.');
+    const uid = userId || localStorage.getItem('user_id');
+    if (!uid) return alert('User not identified.');
     try {
       const resp = await fetch('/api/valve/open', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId })
+        body: JSON.stringify({ userId: uid })
       });
       if (resp.ok) {
         alert('Valve reopened (manual).');
         safe.el('valve-status') && (safe.el('valve-status').textContent = 'OPEN (manual)');
-        await updatePlanUI(userId);
+        await updatePlanUI(uid); // refresh UI state from server
       } else {
         const err = await resp.json().catch(() => ({}));
         console.error('Manual open failed', err);
@@ -871,8 +898,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // --- MANUAL CLOSE (web button) ---
   async function handleManualClose() {
-    const uid = localStorage.getItem('user_id');
+    const uid = userId || localStorage.getItem('user_id');
     if (!uid) return alert('User not identified.');
     try {
       const resp = await fetch('/api/valve/close', {
@@ -883,8 +911,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (resp.ok) {
         safe.el('valve-status') && (safe.el('valve-status').textContent = 'CLOSED (manual)');
         alert('Valve closed (manual).');
-        await updatePlanUI(uid);
+        await updatePlanUI(uid); // refresh UI state
       } else {
+        const err = await resp.json().catch(() => ({}));
+        console.error('Manual close failed', err);
         alert('Could not close valve.');
       }
     } catch (err) {
@@ -895,7 +925,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- CANCEL PLAN (web button) ---
   async function handleCancelPlan() {
-    if (!userId) return alert('User not identified.');
+    const uid = userId || localStorage.getItem('user_id');
+    if (!uid) return alert('User not identified.');
+    if (!lastPlan || !lastPlan.id) return alert('No plan to cancel.');
+
     if (!confirm('Are you sure you want to cancel the current plan?')) return;
 
     try {
@@ -911,24 +944,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!resp.ok) return alert(data?.error || 'Could not cancel plan.');
 
       alert('Plan cancelled.');
+      // stop polling and refresh device state so valve pill shows actual persisted valve status
       stopPollingDeviceState();
+      await updatePlanUI(uid);
+
       safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
       safe.el('planner-result') && (safe.el('planner-result').hidden = true);
-      safe.el('valve-status') && (safe.el('valve-status').textContent = 'CLOSED');
+
+      lastPlan = null;
+      setPlanStatusText('cancelled');
     } catch (err) {
       console.error('Cancel plan error', err);
       alert('Network error when cancelling plan.');
     }
   }
 
-  // bind click listeners
-  document.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'btn-manual-open') handleManualOpen();
-    if (e.target && e.target.id === 'btn-manual-close') handleManualClose();
-    if (e.target && e.target.id === 'cancelPlanBtn') handleCancelPlan();
-  });
-
-  // ---------- Polling & plan persistence helpers (DROP-IN REPLACEMENT) ----------
+  // ---------------- POLLING & UI UPDATE HELPERS ----------------
 
   let deviceStatePollTimer = null;
   let lastPlan = null; // persist last-known plan so UI can show summary after completion
@@ -938,15 +969,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const resp = await fetch(`/api/device/state?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (!resp.ok) { console.warn('device/state fetch failed', resp.status); return null; }
-      return await resp.json().catch(() => null);
+      const json = await resp.json().catch(() => null);
+      return json;
     } catch (err) {
       console.error('fetchDeviceState error', err);
       return null;
     }
   }
 
-  // helper: fetch the most recent plan (active or completed)
-  // server must implement GET /api/plans/latest?userId=...
   async function fetchLatestPlan(uid) {
     if (!uid) return null;
     try {
@@ -960,10 +990,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // updatePlanUI: show plan summary (persisted) and always prefer device state for valve pill
   async function updatePlanUI(uid) {
+    if (!uid) return;
     try {
-      if (!uid) return;
       const device = await fetchDeviceState(uid);        // may include plan if active
       let planObj = device?.plan ?? null;
 
@@ -972,41 +1001,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         planObj = await fetchLatestPlan(uid);
       }
 
-      // If we have a plan (active or completed), map fields and persist to lastPlan
       if (planObj) {
-        // map different naming schemes into a consistent shape
         const p = {
           id: planObj.planId ?? planObj.id ?? planObj.plan_id ?? null,
           perDayTarget: Number(planObj.perDayTarget ?? planObj.per_day_target ?? planObj.dailyTarget ?? 0),
           totalTarget: Number(planObj.totalTarget ?? planObj.total_target_liters ?? 0),
           durationDays: Number(planObj.durationDays ?? planObj.duration_days ?? planObj.duration ?? 0),
           daysElapsed: Number(planObj.daysElapsed ?? planObj.days_elapsed ?? 0),
-          daysLeft: Number(planObj.daysLeft ?? planObj.days_left ?? 0),
+          daysLeft: (planObj.daysLeft === null || typeof planObj.daysLeft === 'undefined') ? null : Number(planObj.daysLeft ?? planObj.days_left ?? 0),
           consumedToday: Number(planObj.consumedToday ?? planObj.consumed_today ?? 0),
           remainingToday: Number(planObj.remainingToday ?? planObj.remaining_today ?? 0),
           endDate: planObj.endDate ?? planObj.end_date ?? '-',
           status: planObj.status ?? (planObj.daysLeft === 0 ? 'completed' : 'active')
         };
 
-        lastPlan = p; // persist on client
+        lastPlan = p;
 
         // write UI fields safely
-        safe.el('ps-daily-target') && (safe.el('ps-daily-target').textContent = p.perDayTarget.toFixed(2));
-        safe.el('ps-total-target') && (safe.el('ps-total-target').textContent = p.totalTarget.toFixed(2));
-        safe.el('ps-duration') && (safe.el('ps-duration').textContent = p.durationDays);
-        safe.el('plan-duration-days') && (safe.el('plan-duration-days').textContent = p.durationDays);
-        safe.el('plan-days-elapsed') && (safe.el('plan-days-elapsed').textContent = (p.daysElapsed ?? '—'));
-        safe.el('plan-days-left') && (safe.el('plan-days-left').textContent = (p.daysLeft ?? '—'));
-        safe.el('plan-consumed-today') && (safe.el('plan-consumed-today').textContent = (p.consumedToday ?? '0.00'));
-        safe.el('plan-remaining-today') && (safe.el('plan-remaining-today').textContent = (p.remainingToday ?? '0.00'));
-        safe.el('plan-end-date') && (safe.el('plan-end-date').textContent = (p.endDate ?? '-'));
+        if (safe.el('ps-daily-target')) safe.el('ps-daily-target').textContent = fmtNumber(p.perDayTarget);
+        if (safe.el('ps-total-target')) safe.el('ps-total-target').textContent = fmtNumber(p.totalTarget);
+        if (safe.el('ps-duration')) safe.el('ps-duration').textContent = (p.durationDays ?? '—');
+        if (safe.el('plan-duration-days')) safe.el('plan-duration-days').textContent = (p.durationDays ?? '—');
+        if (safe.el('plan-days-elapsed')) safe.el('plan-days-elapsed').textContent = (Number.isFinite(p.daysElapsed) ? p.daysElapsed : '—');
+        if (safe.el('plan-days-left')) safe.el('plan-days-left').textContent = (p.daysLeft === null ? '—' : p.daysLeft);
+        if (safe.el('plan-consumed-today')) safe.el('plan-consumed-today').textContent = fmtNumber(p.consumedToday);
+        if (safe.el('plan-remaining-today')) safe.el('plan-remaining-today').textContent = fmtNumber(p.remainingToday);
+        if (safe.el('plan-end-date')) safe.el('plan-end-date').textContent = (p.endDate ?? '-');
         if (safe.el('plan-status')) safe.el('plan-status').textContent = p.status;
+        setPlanStatusText(p.status);
 
-        // always show plan summary (persist it even if completed) and hide calculator
+        // show/hide UI blocks
         safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
         safe.el('planner-result') && (safe.el('planner-result').hidden = true);
       } else {
-        // truly no plan found anywhere — hide summary and show calculator
+        // no plan anywhere
         safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
         safe.el('planner-result') && (safe.el('planner-result').hidden = false);
       }
@@ -1014,13 +1042,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       // ---- Valve pill logic: prefer device flags so it reflects current relay state ----
       const vsEl = safe.el('valve-status');
       if (vsEl && device) {
-        // normalize classes
         vsEl.classList.remove('open', 'closed', 'manual');
 
-        const manual = !!device.manualOverride || device.valveReason === 'manual_override';
-        // if device.valveOpen explicitly provided use it; otherwise try to infer from reason/availableBalance
+        const manual = !!device.manualOverride || device.valveReason === 'manual_override' || device.valveReason === 'manual_close';
         const hasOpenFlag = (typeof device.valveOpen === 'boolean');
-        const open = hasOpenFlag ? device.valveOpen : (device.availableBalance > 0 && device.valveReason !== 'no_balance');
+        const open = hasOpenFlag ? device.valveOpen : ((device.availableBalance || device.available_balance || 0) > 0 && device.valveReason !== 'no_balance');
 
         if (manual) {
           vsEl.textContent = open ? 'OPEN (manual)' : 'CLOSED (manual)';
@@ -1031,11 +1057,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
-     
-      // Do NOT stop polling here — keep polling so user can reopen the valve after completion
+      // Keep polling — do not stop here
       if (lastPlan && lastPlan.status === 'completed') {
-        console.log('Plan completed: UI persisted but polling continues so manual actions are available.');
+        // UI persisted, but we keep polling so manual open still works
+        console.log('Plan completed: UI persisted but polling continues.');
       }
+
     } catch (err) {
       console.error('updatePlanUI error:', err);
     }
@@ -1044,7 +1071,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function startPollingDeviceState(uid, intervalMs = 10000) {
     if (!uid) return;
     if (deviceStatePollTimer) clearInterval(deviceStatePollTimer);
-    // first immediate call
+    // immediate one-time update then interval
     updatePlanUI(uid);
     deviceStatePollTimer = setInterval(() => updatePlanUI(uid), intervalMs);
   }
@@ -1056,23 +1083,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // ON LOAD: seed the UI with latest plan (active or completed), then start polling
+  // ON LOAD: check active plan and start polling (improved)
   (async function checkActivePlanOnLoad() {
     try {
-      if (!userId) {
+      const uid = userId || localStorage.getItem('user_id');
+      if (!uid) {
         safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
         safe.el('planner-result') && (safe.el('planner-result').hidden = true);
         return;
       }
 
-      console.log('📡 Checking active plan for user:', userId);
-      // First try the active endpoint (fast path)
-      const resp = await fetch(`/api/plans/active?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+      console.log('📡 Checking active plan for user:', uid);
+      const resp = await fetch(`/api/plans/active?userId=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       const data = await resp.json().catch(() => null);
       console.log('⬅️ Active plan check:', data);
 
       if (data && data.active && data.plan) {
-        // Active — render and start polling
         lastPlan = {
           id: data.plan.id,
           perDayTarget: Number(data.plan.perDayTarget ?? data.plan.per_day_target ?? 0),
@@ -1087,43 +1113,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         // render via updatePlanUI (which prefers device flags for valve)
-        startPollingDeviceState(userId, 10000);
+        startPollingDeviceState(uid, 10000);
         return;
       }
 
       // No active plan — try latest plan (completed or last)
-      const last = await fetchLatestPlan(userId);
+      const last = await fetchLatestPlan(uid);
       if (last) {
-        // map and persist
         lastPlan = {
           id: last.id ?? last.planId,
           perDayTarget: Number(last.perDayTarget ?? last.per_day_target ?? 0),
           totalTarget: Number(last.totalTarget ?? last.total_target_liters ?? 0),
           durationDays: Number(last.durationDays ?? last.duration_days ?? 0),
           daysElapsed: Number(last.daysElapsed ?? 0),
-          daysLeft: Number(last.daysLeft ?? 0),
+          daysLeft: (typeof last.daysLeft === 'undefined' || last.daysLeft === null) ? null : Number(last.daysLeft),
           consumedToday: Number(last.consumedToday ?? 0),
           remainingToday: Number(last.remainingToday ?? 0),
-          endDate: last.endDate ?? last.end_date ?? '-',
+          endDate: last.endDate ?? '-',
           status: last.status ?? 'completed'
         };
 
-        // render persisted summary and still start polling to update valve pill
-        // show summary (updatePlanUI will also be called immediately by startPollingDeviceState)
+        // show persisted summary and still start polling to update valve pill
         safe.el('plan-summary') && (safe.el('plan-summary').hidden = false);
         safe.el('planner-result') && (safe.el('planner-result').hidden = true);
-        startPollingDeviceState(userId, 10000);
+        startPollingDeviceState(uid, 10000);
         return;
       }
 
       // fallback: no plan at all
       safe.el('plan-summary') && (safe.el('plan-summary').hidden = true);
       safe.el('planner-result') && (safe.el('planner-result').hidden = true);
+
     } catch (err) {
       console.error('Active plan check failed:', err);
     }
   })();
-
 
 
 

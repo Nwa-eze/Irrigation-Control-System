@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SMART AGRICONTROLS LTD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#013220; /* primary green (kept) */
+      --brand-2:#0b6b45;
+      --muted:#6b7280;
+      --bg:#f6f9f6;
+      --card:#ffffff;
+      --radius:12px;
+      --max-width:1150px;
+      --shadow:0 8px 26px rgba(6,40,18,0.06);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      background:linear-gradient(180deg,var(--bg),#eef7ef);
+      color:#102230;line-height:1.5;-webkit-font-smoothing:antialiased;
+    }
+
+    .site{max-width:var(--max-width);margin:18px auto;padding:18px}
+
+    /* Header */
+    header.site-header{background:linear-gradient(90deg,var(--brand),var(--brand-2));color:#fff;border-radius:14px;padding:20px;display:flex;align-items:center;justify-content:space-between;gap:18px;box-shadow:var(--shadow)}
+    .brand{display:flex;gap:14px;align-items:center}
+    .logo{width:64px;height:64px;border-radius:12px;background:rgba(255,255,255,0.12);display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff}
+    .brand h1{margin:0;font-size:20px}
+    .brand p{margin:0;font-size:12px;opacity:.95}
+
+    .header-actions{display:flex;gap:10px;align-items:center}
+    .btn{background:#fff;color:var(--brand);padding:8px 12px;border-radius:10px;border:0;font-weight:600;cursor:pointer;box-shadow:0 6px 18px rgba(2,20,10,0.06);text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+    .btn.secondary{background:transparent;color:rgba(255,255,255,0.95);border:1px solid rgba(255,255,255,0.12)}
+
+    /* Nav */
+    nav.main-nav{margin-top:14px;display:flex;justify-content:center}
+    .navwrap{width:100%;display:flex;align-items:center;justify-content:space-between;gap:18px}
+    .nav-links{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .nav-link{color:var(--brand);background:linear-gradient(180deg,#fff,#fbfffb);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:600}
+    .nav-link:hover{transform:translateY(-2px);transition:transform .15s}
+
+    /* Dropdown */
+    .dropdown{position:relative}
+    .dropbtn{display:inline-flex;gap:8px;align-items:center;padding:9px 14px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfffb);font-weight:700;color:var(--brand);cursor:pointer;border:0}
+    .dropdown-menu{position:absolute;top:48px;right:0;min-width:240px;background:var(--card);border-radius:10px;box-shadow:0 14px 40px rgba(2,20,10,0.12);overflow:hidden;padding:8px;display:none;z-index:40}
+    .dropdown.open .dropdown-menu{display:block}
+    .dropdown-menu a{display:block;text-decoration:none;color:#102230;padding:10px 12px;border-radius:8px;font-weight:600}
+    .dropdown-menu a:hover{background:#f2fbf2}
+
+    /* Main / Hero */
+    .hero{display:grid;grid-template-columns:1fr 360px;gap:28px;margin:28px 0 18px;align-items:start}
+    .hero-card{background:var(--card);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+    .hero h2{margin:0 0 10px;color:var(--brand);font-size:26px}
+    .lead{margin:0 0 12px;color:var(--muted);font-size:15px}
+
+    .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 8px 20px rgba(6,40,18,0.04)}
+    .card h3{margin:0;color:var(--brand);font-size:16px}
+    .card p{margin:8px 0 0 0;color:var(--muted);font-size:14px}
+
+    /* media / images */
+    .hero-image,.product-image,.team-image,.award-image{width:100%;border-radius:10px;object-fit:cover;display:block;margin:12px 0;box-shadow:0 8px 30px rgba(4,20,10,0.06)}
+    .video-container{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px}
+    .video-container iframe{position:absolute;top:0;left:0;width:100%;height:100%}
+
+    /* award block specifics */
+    .award-title{color:var(--brand);font-weight:700;margin:8px 0 6px}
+    .award-text{color:var(--muted);font-size:14px;margin:0 0 8px}
+    .award-actions{display:flex;gap:8px;margin-top:10px}
+
+    /* project embed area */
+    #projectEmbedWrap{display:none;margin-top:12px;border-radius:10px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,0.06)}
+    #projectEmbed{width:100%;border:0;height:640px}
+
+    section{padding:18px 0}
+
+    footer.site-footer{margin:22px 0 40px;text-align:center;color:var(--muted);font-size:13px}
+
+    @media (max-width:980px){.hero{grid-template-columns:1fr} .header-actions{display:none} .hero{gap:18px}}
+    @media (max-width:720px){.site{padding:12px} header.site-header{flex-direction:column;gap:10px;align-items:flex-start}}
+  </style>
+</head>
+<body>
+  <div class="site">
+    <!-- Header -->
+    <header class="site-header">
+      <div class="brand">
+        <div class="logo">SA</div>
+        <div>
+          <h1>Smart AgriControls</h1>
+          <p>SMART AGRICONTROLS LTD</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Contact still navigates to contact section, Request Demo opens mail client -->
+        <a class="btn secondary" href="#contact-us" onclick="showSection('contact-us');return false">Contact</a>
+        <a class="btn" href="mailto:smartagricontrolsltd@gmail.com?subject=Request%20Demo">Request Demo</a>
+      </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="main-nav" aria-label="Main navigation">
+      <div class="navwrap">
+        <div class="nav-links" role="menubar" aria-label="Primary">
+          <a class="nav-link nav-link-main" data-target="home" href="#home">Home</a>
+          <a class="nav-link nav-link-main" data-target="about-us" href="#about-us">About Us</a>
+          <a class="nav-link nav-link-main" data-target="our-products" href="#our-products">Our Products</a>
+          <a class="nav-link nav-link-main" data-target="contact-us" href="#contact-us">Contact Us</a>
+        </div>
+
+        <!-- Projects dropdown -->
+        <div class="dropdown" id="projectsDropdownWrap" aria-haspopup="true">
+          <button class="dropbtn" id="projectsToggle" aria-expanded="false">Projects ▾</button>
+          <div class="dropdown-menu" id="projectsList" role="menu" aria-label="Projects menu"></div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main SPA content -->
+    <main>
+      <!-- HOME -->
+      <section id="home" class="container-card">
+        <div class="hero">
+          <div class="hero-card">
+            <h2>Welcome to Smart AgriControls</h2>
+            <p class="lead">Welcome to Smart AgriControls where innovation meets your dream to create the future you desire. At Smart AgriControls LTD, we leverage cutting edge technologies to address different agricultural problems ranging from irrigation, managing cultivation and post-harvest losses, security in the farm, livestock health to mention a few. Our passion to make contributions in digital agriculture is a driving factor for our team, We believe you will derive maximum benefits from our rage of products and services.</p>
+
+            <div class="video-container" aria-label="IrrigSmart demo video">
+              <iframe src="https://www.youtube.com/embed/nEtaIM9KkvA" frameborder="0" allowfullscreen title="IrrigSmart demo"></iframe>
+            </div>
+
+            <p class="product-title" style="color:var(--brand);font-weight:700;margin-top:12px">Solar-powered Smart Irrigation System (IrrigSmart)</p>
+            <p class="product-desc" style="color:var(--muted)">IrrigSmart brings feedback and intelligence into existing irrigation systems using sensors and mobile Apps that allow farmers to save water by 35% and improve crop yield in a sustainable manner.</p>
+            <p class="product-desc" style="color:var(--muted)">This is the IrrigSmart solution demonstration on a smart farm. The farmer can monitor and control irrigation from remote location on a mobile App.</p>
+
+            <!-- previously there were product cards here (IrrigSmart / Multi-sensor probe / Controller) — removed per request -->
+
+            <!-- embed area -->
+            <div id="projectEmbedWrap">
+              <iframe id="projectEmbed" src="" title="Embedded project"></iframe>
+            </div>
+
+          </div>
+
+          <aside>
+            <div class="hero-card" aria-live="polite">
+              <!-- Award image (local path provided by you) -->
+              <img class="award-image" src="images/NAE Gtrant Award.png" alt="Award plaque - Nigerian Academy of Engineering">
+
+              <div class="award-content">
+                <div class="award-title">NAE Inaugural Innovation Competition — 1st Prize</div>
+                <p class="award-text">
+                  In June 2024 the Smart AgriControls / Elizade University team (IrrigSmart – Solar Powered Smart Irrigation System) won first place at the Nigerian Academy of Engineering's Inaugural Innovation Competition. The award recognises the team's solution for solar-based automated irrigation that combines sensors, decision logic and mobile monitoring to improve water use efficiency and crop outcomes.
+                </p>
+
+                <div class="award-actions">
+                  <a class="btn" href="https://nae.ng/resources/news/352-winners-of-the-inaugural-innovation-competition" target="_blank" rel="noopener">Read more</a>
+                </div>
+              </div>
+
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ABOUT -->
+      <section id="about-us">
+        <div class="hero-card">
+          <h3 style="color:var(--brand)">About Us</h3>
+
+          <img class="team-image" src="images/media.jpg" alt="Team Image 1">
+          <img class="team-image" src="images/media.png" alt="Team Image 2">
+
+          <p style="color:var(--muted)">We are a group of Engineers and complemented with Agricultural and business experts well positioned to address contemporary challenges in the agricultural space with cutting edge technologies.</p>
+
+          <p style="color:var(--muted)">•Olugbenga Ogidan – <strong>CEO/founder</strong>, Smart Agricontrols LTD, Nigeria</p>
+          <p style="color:var(--muted)"><strong>Research and Development Team</strong></p>
+          <p style="color:var(--muted)">•Ganiyu Azeez - <strong>Tech. Officer (Embedded Systems)</strong></p>
+          <p style="color:var(--muted)">• Adesina Adebayo – <strong>Tech. Officer (Web/App development)</strong></p>
+          <p style="color:var(--muted)">•Lasisi Kabir – <strong>Tech. Officer (Solar Energy)</strong></p>
+          <p style="color:var(--muted)">•Joseph Ojotu - <strong>Tech. Officer (Agriculture)</strong></p>
+
+          <p style="color:var(--muted)"><strong>Business Advisers</strong></p>
+          <p style="color:var(--muted)">•Ayodeji Ibosiola - General Manager (Business Lead Dobi Agrico, Nigeria, a 200-hectare farm): <strong>Adviser-Agri-Business and Customer acquisition</strong></p>
+          <p style="color:var(--muted)">•Oluwabusayo Oyetunji (M.Sc. Strategic Management, Imperial college): <strong>Adviser-Fundraising and strategic management</strong></p>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section id="our-products">
+        <div class="hero-card">
+          <h3 style="color:var(--brand)">Our Products</h3>
+
+          <img class="product-image" src="images/media (1).png" alt="Sensor Probe Image">
+
+          <p style="color:var(--muted)">The multi-sensor probe measures temperature, humidity and soil moisture content of the farm environment and sends them through a secured network to the farmer on his mobile device. the device is solar powered and could be left on the farm to detect when the soil is dry and automatically calls fot irrigation of crops. It is also able to detects the soil is wet enough and signals the end of irrigation proces.</p>
+
+          <img class="product-image" src="images/media (2).png" alt="Controller Image">
+
+          <p style="color:var(--muted)">The controller is the coordinating section of the irrigsmart systems. It receives measured parameters from sensor such as the temperature, humidity and soil moisture content of the farm environment. It uses its inbult algorithm to make decision on wheather the farm needs to be irrigated or not and sends the decision to the pums and electronic valves to perform automatic irrigation process. The farmer only needs to sit back and watch on his mobile device the the automatic watering of the farm with little or no human intervention.</p>
+
+          <img class="product-image" src="images/media (3).png" alt="Mobile App Image">
+
+          <p style="color:var(--muted)">·Mobile App: Farmer receives feedback of soil moisture, temperature, and humidity of the farm on his smartphone using our mobile App.· Farmer has the option of starting/stopping irrigation from remote locations using his mobile phone, based on sensor values received on his mobile App</p>
+        </div>
+      </section>
+
+      <!-- CONTACT -->
+      <section id="contact-us">
+        <div class="hero-card">
+          <h3 style="color:var(--brand)">Contact Us</h3>
+          <p style="color:var(--muted)">Smart AgriControls LTD<br>Room FF 099, Faculty of Engineering Complex<br>Elizade University, Ilara-Mokin, Ondo State, Nigeria</p>
+          <p style="margin-top:8px"><a href="mailto:smartagricontrolsltd@gmail.com">smartagricontrolsltd@gmail.com</a>, Tel: +234(0)803 582 5897, +234(0)702 688 0583</p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div>© Smart AgriControls LTD, 2025</div>
+    </footer>
+
+  </div>
+
+  <script>
+    /* SPA behavior */
+    const navLinks = document.querySelectorAll('.nav-link-main');
+    const sections = document.querySelectorAll('main section');
+
+    function showSection(id, push=true){
+      sections.forEach(s => s.style.display = (s.id === id) ? 'block' : 'none');
+      if (id !== 'home') document.getElementById('projectEmbedWrap').style.display = 'none';
+      if (push) history.replaceState(null,'','#'+id);
+      document.getElementById('projectsDropdownWrap').classList.remove('open');
+      document.getElementById('projectsToggle').setAttribute('aria-expanded','false');
+    }
+
+    navLinks.forEach(a => a.addEventListener('click', e => { e.preventDefault(); showSection(a.dataset.target); }));
+
+    document.addEventListener('DOMContentLoaded', () => { const hash=(location.hash||'#home').replace('#',''); showSection(hash,false); });
+
+    /* Projects array (preserve as editable) */
+    const projects = [
+      { title: 'User Oriented Cluster Farming', href: 'index.html', mode: 'link' },
+      { title: 'Administrative Oriented Cluster Farming', href: '#others', mode: 'same' },
+      { title: '-------', href: '#blabla', mode: 'same' }
+    ];
+
+    const projectsList = document.getElementById('projectsList');
+    function renderProjects(){ projectsList.innerHTML=''; projects.forEach(p=>{ const a=document.createElement('a'); a.href=p.href; a.textContent=p.title; a.addEventListener('click', ev=>{ ev.preventDefault(); if(p.mode==='embed'){ showSection('home'); document.getElementById('projectEmbed').src=p.href; document.getElementById('projectEmbedWrap').style.display='block'; } else if(p.mode==='same'){ window.location.href=p.href; } else { window.open(p.href,'_blank','noopener'); } document.getElementById('projectsDropdownWrap').classList.remove('open'); document.getElementById('projectsToggle').setAttribute('aria-expanded','false'); }); projectsList.appendChild(a); }); }
+    renderProjects();
+
+    // dropdown toggle
+    const projectsToggle = document.getElementById('projectsToggle');
+    projectsToggle.addEventListener('click', (e)=>{ const wrap=document.getElementById('projectsDropdownWrap'); wrap.classList.toggle('open'); const expanded=wrap.classList.contains('open'); projectsToggle.setAttribute('aria-expanded', expanded?'true':'false'); e.stopPropagation(); });
+    document.addEventListener('click', ()=>{ document.getElementById('projectsDropdownWrap').classList.remove('open'); projectsToggle.setAttribute('aria-expanded','false'); });
+
+    function openProjectLink(index){ const p = projects[index]; if(!p)return alert('Project not configured'); if(p.mode==='embed'){ showSection('home'); document.getElementById('projectEmbed').src=p.href; document.getElementById('projectEmbedWrap').style.display='block'; } else if(p.mode==='same'){ window.location.href = p.href; } else { window.open(p.href,'_blank','noopener'); } }
+  </script>
+</body>
+</html>

@@ -1,298 +1,279 @@
-/* ============================
-   RESET & GLOBAL
-   ============================ */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', sans-serif;
+/* dashboard.css — magnificent white theme with green accents */
+
+:root {
+  --bg-0: #ffffff;
+  --primary: #1e7a3a;
+  --primary-600: #18632b;
+  --accent: #28a745;
+  --muted: #4b5b4a;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --glass-border: rgba(30, 122, 58, 0.12);
+  --danger: #c0392b;
+  --amber: #d97706;
+  --shadow: 0 8px 24px rgba(14, 36, 18, 0.06);
+  --radius: 12px;
+  --transition: 200ms ease;
+  --font: "Segoe UI", Tahoma, sans-serif;
 }
 
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+html, body { height: 100%; }
+
 body {
-  background-color: #f4f6f8;
-  color: #333;
-  line-height: 1.5;
+  background: var(--bg-0);
+  color: #243028;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ============================
    TOP NAVIGATION BAR
    ============================ */
-/* Ensure the .top-nav retains its layout */
 .top-nav {
   display: flex;
   align-items: center;
-  background-color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
+  box-shadow: var(--shadow);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 30;
   justify-content: space-between;
-  padding: 0 1rem;
+  padding: 1rem 2rem;
+  border-bottom: 2px solid var(--glass-border);
 }
+
 .top-nav ul {
   display: flex;
-  justify-content: center;
-  gap: 2rem;
-  padding: 1rem;
-  margin: 0;
+  gap: 1.5rem;
   list-style: none;
+  padding: 0;
+  margin: 0;
+  align-items: center;
 }
+
 .top-nav .nav-link {
-  position: relative;
   text-decoration: none;
   font-weight: 600;
-  color: #0074D9;
-  transition: color 0.2s ease;
+  color: var(--primary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: color var(--transition), background var(--transition);
 }
+
 .top-nav .nav-link:hover,
 .top-nav .nav-link:focus {
-  color: #005bb5;
+  color: var(--primary-600);
+  background: rgba(30, 122, 58, 0.08);
 }
 
-/* Active state underline */
-/* Remove the underline pseudo-element */
-.top-nav .nav-link.active::after { display: none; }
-
-/* Give the active link a colored background */
 .top-nav .nav-link.active {
-  background-color: #007bff;  /* your highlight color */
-  color: #fff;                /* ensure the text is readable */
-  border-radius: 4px;         /* soften the corners */
-  padding: 0.4rem 0.8rem;     /* add some breathing room */
-}
-
-/* On hover of an active link, keep the highlight */
-.top-nav .nav-link.active:hover {
-  background-color: #005bb5;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
   color: #fff;
+  padding: 0.5rem 1.2rem;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(30, 122, 58, 0.15);
 }
 
-/* Add spacing for the logout button */
-.nav-right {
-  margin-left: auto;
-}
-
-/* Logout button styles */
+.nav-right { margin-left: auto; }
 .btn-logout {
-  background: #e74c3c;
-  color: #fff;
-  border: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 4px;
+  background: rgba(30, 122, 58, 0.1);
+  color: var(--primary);
+  border: 1px solid var(--glass-border);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background 0.2s ease, transform 0.1s ease;
+  font-weight: 600;
+  transition: transform var(--transition), background var(--transition);
 }
-.btn-logout:hover {
-  background: #c0392b;
-  transform: translateY(-1px);
-}
-
+.btn-logout:hover { background: rgba(30, 122, 58, 0.15); transform: translateY(-2px); }
 
 /* ============================
-   SECTION BASE STYLES
+   BASE LAYOUT & CARDS
    ============================ */
 .section {
   max-width: 1200px;
-  margin: 2rem auto;
-  padding: 0 1rem;
+  margin: 2.5rem auto;
+  padding: 0 2rem;
 }
 
-.section h2,
-.section h1 {
-  margin-bottom: 1rem;
-  color: #0074D9;
+.section h1, .section h2 {
+  margin-bottom: 1.5rem;
+  color: var(--primary);
+  font-weight: 700;
 }
 
-/* ============================
-   HOME SECTION
-   ============================ */
-.home-section {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 2rem;
+.home-section, .overview-cards .card, .analytics-section .chart-card,
+.analytics-section .table-card, .payments-section .prepaid-card,
+.payments-section .postpaid-card, .planner-section, .planner-result {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--glass-border);
+  transition: transform var(--transition);
 }
 
-.home-content h1 {
-  font-size: 2em;
-  margin-bottom: 0.5rem;
+.home-section:hover, .overview-cards .card:hover, .analytics-section .chart-card:hover,
+.analytics-section .table-card:hover, .payments-section .prepaid-card:hover,
+.payments-section .postpaid-card:hover, .planner-section:hover, .planner-result:hover {
+  transform: translateY(-2px);
 }
 
-.home-content p {
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  color: #555;
-}
-
-.balance-display {
-  font-size: 1.2rem;
-  margin-top: 0.5rem;
-  font-weight: 600;
-}
-
+/* Overview cards */
 .overview-cards {
-  display: flex;
-  gap: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
   margin-bottom: 2rem;
-  flex-wrap: wrap; /* allow wrapping on narrow screens */
 }
 
 .overview-cards .card {
-  flex: 1 1 200px;         /* at least 200px wide, but grow equally */
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  padding: 1rem;
   text-align: center;
+  padding: 1.5rem;
 }
 
 .overview-cards .card h2 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   margin-bottom: 0.5rem;
-  color: #0074D9;          /* accent color */
+  color: var(--primary);
 }
 
 .overview-cards .card p {
   font-size: 1.5rem;
-  font-weight: 600;
-  color: #333;
-}
-.promo-text {
-  font-size: 1rem;
-  color: #555;
-  margin-top: 1.5rem;
-  text-align: center;
+  font-weight: 700;
+  color: #22331f;
 }
 
 /* ============================
    ANALYTICS SECTION
    ============================ */
-.analytics-section .chart-card,
-.analytics-section .table-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.analytics-section .chart-card {
-  text-align: center;
-}
-
-.analytics-section .table-card {
-  overflow-y: auto;
-  max-height: 400px;
-}
-
-.analytics-section table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.analytics-section th,
-.analytics-section td {
-  padding: 0.75rem;
-  text-align: center;
-  border-bottom: 1px solid #eee;
-}
-
+.analytics-section .chart-card, .analytics-section .table-card { margin-bottom: 2rem; }
+.analytics-section table { width: 100%; border-collapse: collapse; }
+.analytics-section th, .analytics-section td { padding: 0.8rem; text-align: center; border-bottom: 1px solid var(--glass-border); }
 .analytics-section th {
-  background-color: #0074D9;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
   color: #fff;
   position: sticky;
   top: 0;
+  font-weight: 700;
 }
-
 .analytics-meta {
   text-align: center;
   margin: 0.5rem 0 1rem;
-  font-size: 0.95rem;
-  color: #334155;
+  font-size: 1rem;
+  color: var(--muted);
 }
-.analytics-meta strong {
-  color: #2563eb;
+.analytics-meta strong { color: var(--accent); }
+
+/* ============================
+   BUTTONS
+   ============================ */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform var(--transition), box-shadow var(--transition);
+  white-space: nowrap; /* Prevent text overflow */
 }
 
+.btn-primary {
+  background: linear-gradient(180deg, var(--primary), var(--primary-600));
+  color: #fff;
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(30, 122, 58, 0.16); }
+
+.btn-stripe {
+  background: linear-gradient(135deg, #2b8a4a, #246b39);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+}
+.btn-stripe:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(36, 107, 57, 0.16); }
+
+.btn-paystack {
+  background: linear-gradient(135deg, #28b66a, #1ea058);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+}
+.btn-paystack:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(40, 182, 106, 0.16); }
+
+.btn-add {
+  background: linear-gradient(135deg, var(--accent), var(--primary-600));
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  text-align: center;
+}
+.btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(40, 167, 69, 0.16); }
+
+.btn-cancel {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid rgba(192, 57, 43, 0.12);
+  padding: 0.75rem 1.5rem;
+}
+.btn-cancel:hover { background: #fff6f6; transform: translateY(-1px); }
+
+.btn-open {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid rgba(40, 167, 69, 0.14);
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+}
+.btn-open:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(40, 167, 69, 0.16); }
+
+.btn-close {
+  background: #fff;
+  color: var(--danger);
+  border: 1px solid rgba(192, 57, 43, 0.12);
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+}
+.btn-close:hover { background: #fff5f5; transform: translateY(-1px); }
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+}
 
 /* ============================
    PAYMENTS SECTION
    ============================ */
 .payments-section .prepaid-card,
 .payments-section .postpaid-card {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  padding: 1.5rem;
-  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.input-label {
-  display: block;
+.payments-section .input-label {
+  font-weight: 600;
+  color: var(--primary);
   margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #333;
 }
 
-#payment-amount,
-#postpaid-select {
+.payments-section input,
+.payments-section select {
   width: 100%;
-  max-width: 300px;
   padding: 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  margin-bottom: 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
   font-size: 1rem;
+  background: #ffffff;
+  transition: border var(--transition), box-shadow var(--transition);
 }
-
-/* Base button styling */
-.btn {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
-  margin: 0.5rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-/* Stripe buttons (blue gradient) */
-.btn-stripe {
-  background: linear-gradient(135deg, #6772e5, #5469d4);
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(103,114,229,0.4);
-}
-.btn-stripe:hover {
-  background: linear-gradient(135deg, #5469d4, #4353b3);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(103,114,229,0.5);
-}
-
-/* Paystack buttons (green gradient) */
-.btn-paystack {
-  background: linear-gradient(135deg, #29b573, #20a665);
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(41,181,115,0.4);
-}
-.btn-paystack:hover {
-  background: linear-gradient(135deg, #20a665, #198556);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(41,181,115,0.5);
-}
-
-/* “Add Credit” button */
-.btn-add {
-  background-color: #28a745;
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(40,167,69,0.3);
-}
-.btn-add:hover {
-  background-color: #218838;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(40,167,69,0.4);
+.payments-section input:focus,
+.payments-section select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.12);
 }
 
 .payment-buttons,
@@ -300,346 +281,152 @@ body {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-  justify-content: center;
 }
 
 .postpaid-balance {
-  margin-top: 1rem;
-  font-weight: 600;
+  font-size: 1rem;
+  color: var(--muted);
+}
+.postpaid-balance span {
+  color: var(--primary);
+  font-weight: 700;
 }
 
-/* Divider line between prepaid and postpaid */
-.section-divider {
-  border: none;
-  border-top: 2px solid #e0e0e0;
-  margin: 2rem 0;
-}
-
-
-/* ====== planner-section ====== */
+/* ============================
+   PLANNER SECTION
+   ============================ */
 .planner-section {
-  max-width: 600px;
-  margin: 2rem auto;
-  padding: 1.5rem;
-  background: #f9faff;
-  border: 1px solid #e1e8f0;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-}
-.planner-section h2 {
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-  color: #1e3a8a;
-  text-align: center;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 2rem;
 }
 
-/* ====== planner-form ====== */
+.planner-section h2 {
+  color: var(--primary);
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
 .planner-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  grid-gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-}
-.form-row.full-width {
-  grid-column: 1 / -1;
+  gap: 0.5rem;
 }
 
 .form-row label {
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #334155;
-}
-.form-row input,
-.form-row select {
-  padding: 0.5rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  font-weight: 600;
+  color: var(--primary);
   font-size: 1rem;
-  color: #1e293b;
+}
+
+.form-row input,
+.form-row select,
+.form-row .datalist-input {
+  padding: 0.75rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  background: #ffffff;
+  transition: border var(--transition), box-shadow var(--transition);
 }
 .form-row input:focus,
-.form-row select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+.form-row select:focus,
+.form-row .datalist-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.12);
 }
 
-.datalist-input {
+.form-row input::placeholder,
+.form-row .datalist-input::placeholder {
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.form-row.full-width button.btn-primary {
   width: 100%;
-  max-width: 300px;       /* or whatever fits */
-  padding: 0.5rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease;
-}
-.datalist-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+  padding: 0.9rem;
+  font-size: 1.1rem;
 }
 
-/* ====== button ====== */
-.btn-primary {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 1rem;
-  cursor: pointer;
-  text-align: center;
-}
-.btn-primary:hover {
-  background: #1e40af;
-}
-
-
-/* Container spacing */
 .zone-legend {
   margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: #333;
 }
-
-/* Style the summary “header” */
 .zone-legend summary {
   cursor: pointer;
+  color: var(--primary);
   font-weight: 600;
-  padding: 0.4rem 0.6rem;
-  border-radius: 4px;
-  background-color: #f0f4f8;
-  transition: background-color 0.2s;
 }
-.zone-legend summary:hover {
-  background-color: #e2e8f0;
-}
-
-/* Table basics */
 .zone-legend table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 0.5rem;
-  font-size: 0.85rem;
 }
-
-/* Header row */
-.zone-legend th {
-  text-align: left;
-  padding: 0.4rem 0.6rem;
-  background-color: #edf2f7;
-  border-bottom: 1px solid #cbd5e0;
-}
-
-/* Data cells */
+.zone-legend th,
 .zone-legend td {
-  padding: 0.3rem 0.6rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--glass-border);
 }
-
-/* Stripe effect for readability */
-.zone-legend tbody tr:nth-child(odd) {
-  background-color: #fafbfc;
+.zone-legend th {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  color: #fff;
 }
-
-/* Small tweaks for strong emphasis */
 .zone-legend td strong {
-  color: #1a202c;
+  color: var(--primary);
 }
-
-
-/* ====== result panel ====== */
-.planner-result {
-  grid-column: 1 / -1;
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
-}
-.planner-result p {
-  margin: 0.5rem 0;
-  color: #1e293b;
-}
-.planner-result small {
-  color: #555;
-  font-size: 0.85rem;
-}
-
-
-/* ============================
-   RESPONSIVE
-   ============================ */
-@media (max-width: 768px) {
-  .overview-cards {
-    flex-direction: column;
-  }
-  .payment-buttons,
-  .postpaid-pay-buttons {
-    flex-direction: column;
-  }
-}
-
-
-
-/* 1. Hide all sections by default */
-.section {
-  display: none;
-}
-
-/* 2. Reveal only the one matching the URL hash */
-.section:target {
-  display: block;
-}
-
-/* 3. If no hash is present, default to showing #home-section */
-body:not(:target) #home-section {
-  display: block;
-}
-
-
-
-.zone-legend table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-/* Make only the tbody scrollable and show ~4 rows */
 .zone-legend tbody {
   display: block;
-  max-height: calc(4 * 2.5rem); /* adjust 2.5rem to your row height */
+  max-height: 120px; /* Limit to ~3 rows */
   overflow-y: auto;
 }
-
-/* Keep the header fixed and aligned */
-.zone-legend thead,
-.zone-legend tbody tr {
+.zone-legend tr {
   display: table;
   width: 100%;
   table-layout: fixed;
 }
 
-/* Optional: style scrollbars for WebKit browsers */
-.zone-legend tbody::-webkit-scrollbar {
-  width: 6px;
+.planner-result {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
 }
-.zone-legend tbody::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.2);
-  border-radius: 3px;
+.planner-result p {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
 }
-.zone-legend tbody::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* Cell padding & borders */
-.zone-legend th,
-.zone-legend td {
-  padding: 0.4rem 0.6rem;
-  border-bottom: 1px solid #e2e8f0;
+.planner-result strong {
+  color: var(--primary);
 }
 
-/* container: horizontally aligns button + valve text */
 .plan-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-top: 0.6rem;
-}
-
-/* --- Shared button base --- */
-.btn-action {
-  flex: 1;
-  padding: 0.45rem 0.7rem;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
-  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
-  border: 1px solid transparent;
-  text-align: center;
-}
-
-/* --- Cancel Plan --- */
-.btn-cancel {
-  background: #fff;
-  color: #c0392b;
-  border-color: #e0b4b4;
-}
-.btn-cancel:hover {
-  background: #fff6f6;
-  transform: translateY(-1px);
-}
-.btn-cancel:active { transform: translateY(0); }
-.btn-cancel:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* --- Close Valve --- */
-.btn-close {
-  background: #fff;
-  color: #b03a2e;
-  border-color: #e0b4b4;
-}
-.btn-close:hover {
-  background: #fff5f5;
-  transform: translateY(-1px);
-}
-.btn-close:active { transform: translateY(0); }
-
-/* --- Reopen Valve --- */
-.btn-open {
-  background: #fff;
-  color: #1e8449;
-  border-color: #a9dfbf;
-}
-.btn-open:hover {
-  background: #f6fff9;
-  transform: translateY(-1px);
-}
-.btn-open:active { transform: translateY(0); }
-
-/* --- Layout for the action buttons row --- */
-.action-buttons {
   display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-/* --- Valve indicator layout --- */
-.valve-indicator {
-  display: inline-flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  color: #333;
-  padding: 0.2rem 0.4rem;
-  border-radius: 6px;
 }
 
-/* --- Small pill status --- */
+.valve-indicator {
+  font-size: 1rem;
+  color: var(--muted);
+}
 .valve-status {
   display: inline-block;
-  min-width: 56px;
+  min-width: 80px;
   text-align: center;
-  padding: 0.25rem 0.5rem;
+  padding: 0.3rem 0.8rem;
   border-radius: 999px;
   font-weight: 700;
   color: #fff;
-  background: #999; /* default */
-  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(30, 122, 58, 0.08);
 }
-
-/* --- Status colors --- */
-.valve-status.open { background: #27ae60; }    /* green */
-.valve-status.closed { background: #c0392b; }  /* red */
-.valve-status.manual { background: #f39c12; }  /* amber for manual override */
+.valve-status.open { background: var(--accent); }
+.valve-status.closed { background: var(--danger); }
+.valve-status.manual { background: var(--amber); }
