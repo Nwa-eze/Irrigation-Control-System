@@ -53,7 +53,7 @@
     .dropdown-menu a:hover{background:#f2fbf2}
 
     /* Main / Hero */
-    .hero{display:grid;grid-template-columns:1fr 360px;gap:28px;margin:28px 0 18px;align-items:start}
+    .hero{display:grid;grid-template-columns:1fr 360px;gap:28px;margin:28px 0 18px;align-items:stretch}
     .hero-card{background:var(--card);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
     .hero h2{margin:0 0 10px;color:var(--brand);font-size:26px}
     .lead{margin:0 0 12px;color:var(--muted);font-size:15px}
@@ -63,7 +63,12 @@
     .card p{margin:8px 0 0 0;color:var(--muted);font-size:14px}
 
     /* media / images */
-    .hero-image,.product-image,.team-image,.award-image{width:100%;border-radius:10px;object-fit:cover;display:block;margin:12px 0;box-shadow:0 8px 30px rgba(4,20,10,0.06)}
+    .hero-image,.award-image{width:100%;border-radius:10px;object-fit:cover;display:block;margin:12px 0;box-shadow:0 8px 30px rgba(4,20,10,0.06)}
+    .product-image,.team-image{max-width:80%;height:auto;border-radius:10px;object-fit:contain;display:block;margin:12px auto;box-shadow:0 8px 30px rgba(4,20,10,0.06);border:1px solid rgba(6,40,18,0.1);transition:transform 0.2s ease-in-out}
+    .product-image:hover,.team-image:hover{transform:scale(1.02)}
+
+    .image-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+
     .video-container{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px}
     .video-container iframe{position:absolute;top:0;left:0;width:100%;height:100%}
 
@@ -80,8 +85,8 @@
 
     footer.site-footer{margin:22px 0 40px;text-align:center;color:var(--muted);font-size:13px}
 
-    @media (max-width:980px){.hero{grid-template-columns:1fr} .header-actions{display:none} .hero{gap:18px}}
-    @media (max-width:720px){.site{padding:12px} header.site-header{flex-direction:column;gap:10px;align-items:flex-start}}
+    @media (max-width:980px){.hero{grid-template-columns:1fr} .header-actions{display:none} .hero{gap:18px} .product-image,.team-image{max-width:90%}}
+    @media (max-width:720px){.site{padding:12px} header.site-header{flex-direction:column;gap:10px;align-items:flex-start} .image-grid{grid-template-columns:1fr} .product-image,.team-image{max-width:100%}}
   </style>
 </head>
 <body>
@@ -154,7 +159,7 @@
               <div class="award-content">
                 <div class="award-title">NAE Inaugural Innovation Competition — 1st Prize</div>
                 <p class="award-text">
-                  In June 2024 the Smart AgriControls / Elizade University team (IrrigSmart – Solar Powered Smart Irrigation System) won first place at the Nigerian Academy of Engineering's Inaugural Innovation Competition. The award recognises the team's solution for solar-based automated irrigation that combines sensors, decision logic and mobile monitoring to improve water use efficiency and crop outcomes.
+                  Our Solar-Powered Smart Irrigation System (IrrigSmart) won first place nationwide at the Nigerian Academy of Engineering's Inaugural Innovation Competition, 2024. This was during the Academy dinner and award night held at Radisson Blu Hotel, Ikeja GRA, Lagos on the 24th June, 2024. The innovation combines sensors, decision logic and mobile monitoring to improve water use efficiency and crop outcomes. The award recognises the team's solution for combatting the effects of climate change while promoting food security in the nation.
                 </p>
 
                 <div class="award-actions">
