@@ -11,34 +11,42 @@ const axios = require("axios");
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_BASE_URL   = "https://api.paystack.co";
 const crypto = require('crypto');
-const BASE_URL = process.env.BASE_URL || 'http://10.32.164.142:3005';
+const BASE_URL = process.env.BASE_URL;
 
 
 const app = express();
 app.use(cors({
-  origin: 'http://10.32.164.142:3005', // Your frontend URL
+  origin: 'http://172.19.151.142:3005', // Your frontend URL
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
 app.use(bodyParser.json());
+
+app.get('/', (req,res) => {
+  res.sendFile(path.join(__dirname, 'public', 'test.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 
 // Create a MySQL connection pool (adjust with your credentials)
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'your_database_name',
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
 
-// --- user_plan_days helpers ---
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// getOrCreatePlanDay(planId, dayDate)
 async function getOrCreatePlanDay(planId, dayDate) {
-  // dayDate : 'YYYY-MM-DD' string
   const [rows] = await pool.execute(
     `SELECT id, consumed_liters FROM user_plan_days WHERE plan_id = ? AND day_date = ? LIMIT 1`,
     [planId, dayDate]
@@ -46,7 +54,7 @@ async function getOrCreatePlanDay(planId, dayDate) {
   if (rows.length) return rows[0];
 
   const [ins] = await pool.execute(
-    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters) VALUES (?, ?, 0)`,
+    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters, created_at, updated_at) VALUES (?, ?, 0, NOW(), NOW())`,
     [planId, dayDate]
   );
   const [newRow] = await pool.execute(
@@ -56,31 +64,29 @@ async function getOrCreatePlanDay(planId, dayDate) {
   return newRow[0];
 }
 
+// addConsumptionToPlanDay(planId, dayDate, deltaLiters)
 async function addConsumptionToPlanDay(planId, dayDate, deltaLiters) {
-  // ensure positive numeric
   const delta = Number(deltaLiters) || 0;
   if (delta <= 0) return;
 
-  // upsert consumed_liters atomically
   await pool.execute(
-    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters)
-       VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE consumed_liters = consumed_liters + VALUES(consumed_liters)`,
+    `INSERT INTO user_plan_days (plan_id, day_date, consumed_liters, created_at, updated_at)
+       VALUES (?, ?, ?, NOW(), NOW())
+     ON DUPLICATE KEY UPDATE consumed_liters = consumed_liters + VALUES(consumed_liters), updated_at = NOW()`,
     [planId, dayDate, delta]
   );
 
-  // optionally update aggregate in user_plans.consumed_total
   try {
     await pool.execute(
       `UPDATE user_plans SET consumed_total = COALESCE(consumed_total,0) + ? WHERE id = ?`,
       [delta, planId]
     );
   } catch (e) {
-    // not fatal — log and continue
     console.error('[addConsumptionToPlanDay] failed to update consumed_total:', e);
   }
 }
 
+// getConsumedTodayForPlan(planId, dayDate)
 async function getConsumedTodayForPlan(planId, dayDate) {
   const [rows] = await pool.execute(
     `SELECT consumed_liters FROM user_plan_days WHERE plan_id = ? AND day_date = ? LIMIT 1`,
@@ -668,142 +674,244 @@ app.post("/update_balance", async (req, res) => {
 });
 
 
+async function planAllowsOpen(userId, balance) {
+  const [[plan]] = await pool.execute(
+    `SELECT id, start_volume, per_day_target, total_target_liters, duration_days, start_datetime, last_reset_date
+       FROM user_plans
+      WHERE user_id=? AND status='active'
+      ORDER BY id DESC
+      LIMIT 1`,
+    [userId]
+  );
 
-// GET /valve_states - robust, uses persisted per-day ledger for consumedToday
+  if (!plan) return { hasPlan: false, allowsOpen: false, reason: 'no_plan' };
+
+  const today = new Date().toISOString().slice(0,10);
+  let consumedToday = 0;
+  try {
+    consumedToday = await getConsumedTodayForPlan(plan.id, today);
+  } catch (e) {
+    // fallback to meter diff if ledger not available
+    const [[meterRow]] = await pool.execute(
+      `SELECT volume FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
+      [userId]
+    );
+    const currVol = parseFloat(meterRow?.volume || 0);
+    const startVol = (plan.start_volume !== null && plan.start_volume !== undefined)
+                       ? parseFloat(plan.start_volume || 0)
+                       : currVol;
+    consumedToday = Math.max(0, currVol - startVol);
+  }
+
+  const perDay = parseFloat(plan.per_day_target || 0);
+  const duration = parseInt(plan.duration_days || 0);
+  const startMs = plan.start_datetime ? new Date(plan.start_datetime).getTime() : Date.now();
+  const daysElapsed = Math.floor((Date.now() - startMs) / (1000*60*60*24));
+  const hitToday = perDay > 0 && consumedToday >= perDay;
+  const exceedDays = duration > 0 && daysElapsed >= duration;
+
+  // Balance priority
+  if ((balance === null ? 0 : Number(balance)) <= 0) {
+    return { hasPlan: true, allowsOpen: false, reason: 'no_balance', consumedToday, perDay, daysElapsed, duration, planId: plan.id };
+  }
+
+  // Duration exhausted -> mark completed and lock the valve permanently (plan_locked)
+  if (exceedDays) {
+    try {
+      await pool.execute(`UPDATE user_plans SET status='completed', completed_at = NOW() WHERE id = ? AND status = 'active'`, [plan.id]);
+      await pool.execute(
+        `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+           VALUES (?, 0, 'planner', 'plan_locked', NOW())
+         ON DUPLICATE KEY UPDATE
+           is_open = VALUES(is_open),
+           source  = VALUES(source),
+           reason  = VALUES(reason),
+           last_changed_at = VALUES(last_changed_at)`,
+        [userId]
+      );
+      console.log(`[planAllowsOpen] plan ${plan.id} completed -> locked valve for user ${userId}`);
+    } catch (e) {
+      console.error('[planAllowsOpen] failed to persist plan lock', e);
+    }
+    return { hasPlan: true, allowsOpen: false, reason: 'duration_complete', consumedToday, perDay, daysElapsed, duration, planId: plan.id };
+  }
+
+  // Daily limit hit -> close for the rest of the day but DO NOT complete the plan
+  if (hitToday) {
+    try {
+      await pool.execute(
+        `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+           VALUES (?, 0, 'planner', 'daily_limit', NOW())
+         ON DUPLICATE KEY UPDATE
+           is_open = VALUES(is_open),
+           source  = VALUES(source),
+           reason  = VALUES(reason),
+           last_changed_at = VALUES(last_changed_at)`,
+        [userId]
+      );
+      console.log(`[planAllowsOpen] plan ${plan.id}: daily target hit -> closed for the day for user ${userId}`);
+    } catch (e) {
+      console.error('[planAllowsOpen] failed to persist daily_limit', e);
+    }
+    return { hasPlan: true, allowsOpen: false, reason: 'daily_limit', consumedToday, perDay, daysElapsed, duration, planId: plan.id };
+  }
+
+  // Plan exists and allows open
+  return { hasPlan: true, allowsOpen: true, reason: 'plan_ok', consumedToday, perDay, daysElapsed, duration, planId: plan.id };
+}
+
+
+
+// GET /valve_states - planner has priority; manual close persists, balance auto-open only if is_open IS NULL (auto)
 app.get('/valve_states', async (req, res) => {
   try {
-    const userIds = [1,2,3]; // adjust as needed
+    const userIds = [1,2,3]; // adjust as needed or derive dynamically
 
-    // 1) fetch balances
+    // fetch balances for users
     const [rows] = await pool.query(
-      `SELECT u.id AS user_id,
-              COALESCE(u.available_balance, 0) AS available_balance
+      `SELECT u.id AS user_id, COALESCE(u.available_balance, 0) AS available_balance
        FROM users u
        WHERE u.id IN (?,?,?)
        ORDER BY u.id`,
       userIds
     );
-    console.log('[/valve_states] balances:', rows);
-
-    async function planAllowsOpen(userId) {
-      const [[plan]] = await pool.execute(
-        `SELECT id, start_volume, per_day_target, total_target_liters, duration_days, start_datetime, last_reset_date
-           FROM user_plans
-          WHERE user_id=? AND status='active'
-          ORDER BY id DESC
-          LIMIT 1`,
-        [userId]
-      );
-      if (!plan) return { allowsOpen: false, reason: 'no_plan' };
-
-      // get persisted consumedToday from ledger
-      const today = new Date().toISOString().slice(0,10);
-      let consumedToday = 0;
-      try {
-        consumedToday = await getConsumedTodayForPlan(plan.id, today);
-      } catch (e) {
-        console.error('[planAllowsOpen] failed to read consumedToday from ledger, falling back to sensor calc:', e);
-        // fallback: best-effort compute from latest sensor row and start_volume
-        const [[meterRow]] = await pool.execute(
-          `SELECT volume FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
-          [userId]
-        );
-        const currVol = parseFloat(meterRow?.volume || 0);
-        const startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
-                           ? parseFloat(plan.start_volume || 0)
-                           : currVol;
-        consumedToday = Math.max(0, currVol - startVol);
-      }
-
-      const perDay = parseFloat(plan.per_day_target || 0);
-      const duration = parseInt(plan.duration_days || 0);
-      const startMs = plan.start_datetime ? new Date(plan.start_datetime).getTime() : Date.now();
-      const daysElapsed = Math.floor((Date.now() - startMs) / (1000*60*60*24));
-      const hitToday = perDay > 0 && consumedToday >= perDay;
-      const exceedDays = duration > 0 && daysElapsed >= duration;
-
-      console.log(`[planAllowsOpen] user=${userId} planId=${plan.id} consumedToday=${consumedToday} perDay=${perDay} daysElapsed=${daysElapsed} duration=${duration}`);
-
-      if (exceedDays || hitToday) {
-        const reason = exceedDays ? 'duration_complete' : 'daily_limit';
-        // mark plan completed
-        try {
-          await pool.execute(
-            `UPDATE user_plans SET status='completed', completed_at = NOW() WHERE id = ? AND status = 'active'`,
-            [plan.id]
-          );
-          console.log(`[planAllowsOpen] marked plan ${plan.id} completed (user ${userId})`);
-        } catch (e) {
-          console.error('[planAllowsOpen] failed to mark plan completed', e);
-        }
-
-        return { allowsOpen: false, reason, consumedToday, perDay, daysElapsed, duration };
-      }
-
-      return { allowsOpen: true, reason: 'plan_ok', consumedToday, perDay, daysElapsed, duration };
-    }
 
     const result = {};
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
+    for (const r of rows) {
       const uid = r.user_id;
       const balance = parseFloat(r.available_balance || 0);
 
-      // Fetch manual flag (now tri-state: 1, 0, null)
-      const [[vrow]] = await pool.execute(`SELECT is_open FROM valve_state WHERE user_id = ? LIMIT 1`, [uid]);
-      const isOpenFlag = vrow ? vrow.is_open : null;  // null for auto
-      let manualOpenNow = isOpenFlag === 1;  // For logging/compat
-      console.log(`[valve_states] user ${uid} isOpenFlag:`, isOpenFlag);
+      // current valve state
+      const [[vrow]] = await pool.execute(`SELECT is_open, reason, source, last_changed_at FROM valve_state WHERE user_id = ? LIMIT 1`, [uid]);
+      const isOpenFlag = (vrow && typeof vrow.is_open !== 'undefined') ? vrow.is_open : null;
+      const vReason = vrow?.reason || null;
+      const vSource = vrow?.source || null;
+
+      // check plan with balance priority
+      let planInfo;
+      try {
+        planInfo = await planAllowsOpen(uid, balance);
+      } catch (e) {
+        console.error('[valve_states] planAllowsOpen error for user', uid, e);
+        planInfo = { hasPlan: false, allowsOpen: false, reason: 'plan_check_error' };
+      }
 
       let state = false;
       let reason = 'unknown';
-      let planInfo = null;  // Declare here to avoid ReferenceError
 
-      if (balance <= 0) {
-        state = false;
-        reason = 'no_balance';
-        // Reset any force-open to auto (null)
-        if (isOpenFlag === 1) {
-          await pool.execute(`UPDATE valve_state SET is_open = NULL WHERE user_id = ?`, [uid]);
-          console.log(`[valve_states] user ${uid} balance<=0: reset force-open to auto`);
-        }
-      } else {
-        // balance > 0
-        if (isOpenFlag === 0) {
+      if (planInfo.hasPlan) {
+        // Plan exists: planAllowsOpen already respected balance and wrote valve_state for daily_limit/duration
+        if (!planInfo.allowsOpen) {
           state = false;
-          reason = 'manual_close';
-        } else if (isOpenFlag === 1) {
-          state = true;
-          reason = 'manual_override';
+          reason = planInfo.reason || 'plan_blocked';
         } else {
-          // auto (null)
+          // Planner wants it open
+          state = true;
+          reason = 'plan_ok';
           try {
-            planInfo = await planAllowsOpen(uid);
-          } catch (e) {
-            console.error(`[valve_states] planAllowsOpen failed for ${uid}`, e);
-            planInfo = { allowsOpen: false, reason: 'plan_check_error' };
-          }
+            await pool.execute(
+              `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                 VALUES (?, 1, 'planner', NULL, NOW())
+               ON DUPLICATE KEY UPDATE
+                 is_open = VALUES(is_open),
+                 source  = VALUES(source),
+                 reason  = VALUES(reason),
+                 last_changed_at = VALUES(last_changed_at)`,
+              [uid]
+            );
+          } catch (e) { console.error('[valve_states] failed persist planner open', e); }
+        }
 
-          if (planInfo.reason !== 'no_plan') {
-            state = planInfo.allowsOpen;
-            reason = state ? 'plan_ok' : planInfo.reason;
+        // expose plan fields
+        result[`user${uid}_consumedToday`] = planInfo.consumedToday ?? null;
+        result[`user${uid}_perDayTarget`] = planInfo.perDay ?? null;
+        result[`user${uid}_daysElapsed`] = planInfo.daysElapsed ?? null;
+        result[`user${uid}_duration`] = planInfo.duration ?? null;
+
+      } else {
+        // No plan: manual or balance/system logic. Manual overrides persist.
+        if (vSource === 'manual' && isOpenFlag === 1) {
+          state = true; reason = 'manual_override';
+        } else if (vSource === 'manual' && isOpenFlag === 0) {
+          state = false; reason = 'manual_close';
+        } else {
+          // Not manual: check if plan_locked exists (must stay closed until manual)
+          if (vReason === 'plan_locked') {
+            state = false; reason = 'plan_locked';
           } else {
-            state = true;
-            reason = 'balance_ok';
+            // Normal balance/system behaviour
+            if (isOpenFlag === 1 && vSource !== 'manual') {
+              if (balance <= 0) {
+                // persist system close
+                try {
+                  await pool.execute(
+                    `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                       VALUES (?, 0, 'system', 'no_balance', NOW())
+                     ON DUPLICATE KEY UPDATE
+                       is_open = VALUES(is_open),
+                       source  = VALUES(source),
+                       reason  = VALUES(reason),
+                       last_changed_at = VALUES(last_changed_at)`,
+                    [uid]
+                  );
+                } catch (e) { console.error('[valve_states] failed persist close on zero-balance', e); }
+                state = false; reason = 'no_balance';
+              } else {
+                state = true; reason = 'balance_ok';
+              }
+            } else if (isOpenFlag === 0 && vSource !== 'manual') {
+              // previously system-closed or planner daily_limit: re-open on top-up if not plan_locked
+              if (balance > 0) {
+                try {
+                  await pool.execute(
+                    `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                       VALUES (?, 1, 'system', NULL, NOW())
+                     ON DUPLICATE KEY UPDATE
+                       is_open = VALUES(is_open),
+                       source  = VALUES(source),
+                       reason  = VALUES(reason),
+                       last_changed_at = VALUES(last_changed_at)`,
+                    [uid]
+                  );
+                } catch (e) { console.error('[valve_states] failed to re-open on top-up', e); }
+                state = true; reason = 'balance_ok';
+              } else {
+                state = false; reason = 'no_balance';
+              }
+            } else {
+              // auto (is_open IS NULL) or no row
+              if (balance > 0) {
+                try {
+                  await pool.execute(
+                    `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                       VALUES (?, 1, 'system', NULL, NOW())
+                     ON DUPLICATE KEY UPDATE
+                       is_open = VALUES(is_open),
+                       source  = VALUES(source),
+                       reason  = VALUES(reason),
+                       last_changed_at = VALUES(last_changed_at)`,
+                    [uid]
+                  );
+                } catch (e) { console.error('[valve_states] failed persist balance open', e); }
+                state = true; reason = 'balance_ok';
+              } else {
+                state = false; reason = 'no_balance';
+              }
+            }
           }
         }
+
+        // no-plan fields
+        result[`user${uid}_consumedToday`] = null;
+        result[`user${uid}_perDayTarget`] = null;
+        result[`user${uid}_daysElapsed`] = null;
+        result[`user${uid}_duration`] = null;
       }
 
       result[`user${uid}_state`] = state;
       result[`user${uid}_reason`] = reason;
-      result[`user${uid}_consumedToday`] = planInfo?.consumedToday ?? null;
-      result[`user${uid}_perDayTarget`] = planInfo?.perDay ?? null;
-      result[`user${uid}_daysElapsed`] = planInfo?.daysElapsed ?? null;
-      result[`user${uid}_duration`] = planInfo?.duration ?? null;
     }
 
-
-    console.log('[/valve_states] result:', result);
     return res.json(result);
   } catch (err) {
     console.error('Error in /valve_states route:', err);
@@ -822,9 +930,13 @@ app.post('/api/valve/open', async (req, res) => {
   try {
     console.log(`[API] /api/valve/open called for user ${userId}`);
     await pool.execute(
-      `INSERT INTO valve_state (user_id, is_open)
-         VALUES (?, TRUE)
-       ON DUPLICATE KEY UPDATE is_open = TRUE`,
+      `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+         VALUES (?, 1, 'manual', NULL, NOW())
+       ON DUPLICATE KEY UPDATE
+         is_open = VALUES(is_open),
+         source  = VALUES(source),
+         reason  = VALUES(reason),
+         last_changed_at = VALUES(last_changed_at)`,
       [userId]
     );
     return res.sendStatus(204);
@@ -842,9 +954,13 @@ app.post('/api/valve/close', async (req, res) => {
   try {
     console.log(`[API] /api/valve/close called for user ${userId}`);
     await pool.execute(
-      `INSERT INTO valve_state (user_id, is_open)
-         VALUES (?, FALSE)
-       ON DUPLICATE KEY UPDATE is_open = FALSE`,
+      `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+         VALUES (?, 0, 'manual', NULL, NOW())
+       ON DUPLICATE KEY UPDATE
+         is_open = VALUES(is_open),
+         source  = VALUES(source),
+         reason  = VALUES(reason),
+         last_changed_at = VALUES(last_changed_at)`,
       [userId]
     );
     return res.sendStatus(204);
@@ -1034,12 +1150,13 @@ function todayString() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// GET /api/device/state - returns single-user plan & valve decision (defensive)
 app.get('/api/device/state', async (req, res) => {
   const userId = req.query.userId;
   if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
   try {
-    // 1) fetch active plan
+    // fetch the active plan (if any)
     const [[plan]] = await pool.execute(
       `SELECT id, start_volume, per_day_target, total_target_liters,
               duration_days, start_datetime, last_reset_date
@@ -1050,172 +1167,216 @@ app.get('/api/device/state', async (req, res) => {
       [userId]
     );
 
-    // No active plan -- return valve state and balance
-    if (!plan) {
-      const [[vsRow]] = await pool.execute(
-        `SELECT is_open FROM valve_state WHERE user_id=? LIMIT 1`,
-        [userId]
-      );
-      const [[{ available_balance = 0 }]] = await pool.execute(
-        `SELECT available_balance FROM users WHERE id = ?`,
-        [userId]
-      );
-      const avail = parseFloat(available_balance) || 0;
-      const isOpenFlag = vsRow ? vsRow.is_open : null;
-      const manualOverride = isOpenFlag === 1;
-      const valveOpen = (avail > 0) && (isOpenFlag !== 0);  // Auto open if balance >0 and not force-closed
-
-      return res.json({
-        plan: null,
-        valveOpen: !!valveOpen,
-        valveReason: valveOpen ? (manualOverride ? 'manual_override' : 'balance_ok') : (avail <= 0 ? 'no_balance' : 'manual_close'),
-        manualOverride,
-        availableBalance: Number(avail.toFixed(2))
-      });
-    }
-
-    // 2) latest meter reading
-    const [[{ volume: currVolRaw = 0 }]] = await pool.execute(
-      `SELECT volume FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`,
+    // read valve_state
+    const [[vsRow]] = await pool.execute(
+      `SELECT is_open, reason, source, last_changed_at FROM valve_state WHERE user_id=? LIMIT 1`,
       [userId]
     );
-    const currVol = parseFloat(currVolRaw) || 0;
+    const isOpenFlag = (vsRow && typeof vsRow.is_open !== 'undefined') ? vsRow.is_open : null;
+    const vSource = vsRow?.source || null;
+    const vReason = vsRow?.reason || null;
 
-    // 3) manual override flag (tri-state)
-    const [[vsRow2]] = await pool.execute(
-      `SELECT is_open FROM valve_state WHERE user_id=? LIMIT 1`,
-      [userId]
-    );
-    const isOpenFlag = vsRow2 ? vsRow2.is_open : null;
-    const manualOverride = isOpenFlag === 1;  // Only true for force-open
-
-    // 4) available balance
+    // balance
     const [[{ available_balance = 0 }]] = await pool.execute(
-      `SELECT available_balance FROM users WHERE id = ?`,
+      `SELECT COALESCE(available_balance,0) AS available_balance FROM users WHERE id = ?`,
       [userId]
     );
     const availBal = parseFloat(available_balance) || 0;
-
-    // 5) DB-driven daily reset (safe update: only runs when last_reset_date is older than today)
     const today = todayString();
-    const [resetResult] = await pool.execute(
-      `UPDATE user_plans
-          SET last_reset_date = CURDATE(), start_volume = ?
-        WHERE id = ? AND (last_reset_date IS NULL OR last_reset_date < CURDATE())`,
-      [currVol, plan.id]
-    );
-    if (resetResult && resetResult.affectedRows > 0) {
-      plan.start_volume = currVol;
-      plan.last_reset_date = today;
+
+    // NO PLAN branch
+    if (!plan) {
+      // Manual overrides
+      if (isOpenFlag === 1 && vSource === 'manual') {
+        return res.json({ plan: null, valveOpen: true, valveReason: 'manual_override', manualOverride: true, availableBalance: Number(availBal.toFixed(2)) });
+      }
+      if (isOpenFlag === 0 && vSource === 'manual') {
+        return res.json({ plan: null, valveOpen: false, valveReason: 'manual_close', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+      }
+
+      // If plan_locked present, keep locked until manual intervention
+      if (vReason === 'plan_locked') {
+        return res.json({ plan: null, valveOpen: false, valveReason: 'plan_locked', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+      }
+
+      // If system-open but balance dropped -> persist close
+      if (isOpenFlag === 1 && vSource !== 'manual') {
+        if (availBal <= 0) {
+          try {
+            await pool.execute(
+              `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                 VALUES (?, 0, 'system', 'no_balance', NOW())
+               ON DUPLICATE KEY UPDATE
+                 is_open = VALUES(is_open),
+                 source  = VALUES(source),
+                 reason  = VALUES(reason),
+                 last_changed_at = VALUES(last_changed_at)`,
+              [userId]
+            );
+            console.log(`[device/state] balance<=0: closing previously system-open valve for user ${userId}`);
+          } catch (e) {
+            console.error('[device/state] failed to persist close on zero-balance', e);
+          }
+          return res.json({ plan: null, valveOpen: false, valveReason: 'no_balance', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+        }
+        return res.json({ plan: null, valveOpen: true, valveReason: 'balance_ok', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+      }
+
+      // If previously system-closed (not manual) -> allow reopen on top-up
+      if (isOpenFlag === 0 && vSource !== 'manual') {
+        if (availBal > 0) {
+          try {
+            await pool.execute(
+              `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                 VALUES (?, 1, 'system', NULL, NOW())
+               ON DUPLICATE KEY UPDATE
+                 is_open = VALUES(is_open),
+                 source  = VALUES(source),
+                 reason  = VALUES(reason),
+                 last_changed_at = VALUES(last_changed_at)`,
+              [userId]
+            );
+          } catch (e) {
+            console.error('[device/state] failed to re-open on top-up', e);
+          }
+          return res.json({ plan: null, valveOpen: true, valveReason: 'balance_ok', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+        } else {
+          return res.json({ plan: null, valveOpen: false, valveReason: 'no_balance', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+        }
+      }
+
+      // Auto mode or missing valve_state row
+      if (isOpenFlag === null) {
+        if (availBal > 0) {
+          try {
+            await pool.execute(
+              `INSERT INTO valve_state (user_id, is_open, source, reason, last_changed_at)
+                 VALUES (?, 1, 'system', NULL, NOW())
+               ON DUPLICATE KEY UPDATE
+                 is_open = VALUES(is_open),
+                 source  = VALUES(source),
+                 reason  = VALUES(reason),
+                 last_changed_at = VALUES(last_changed_at)`,
+              [userId]
+            );
+          } catch (e) { console.error('[device/state] failed to persist balance-open', e); }
+          return res.json({ plan: null, valveOpen: true, valveReason: 'balance_ok', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+        } else {
+          return res.json({ plan: null, valveOpen: false, valveReason: 'no_balance', manualOverride: false, availableBalance: Number(availBal.toFixed(2)) });
+        }
+      }
+
+      // fallback respect persisted flag
+      if (isOpenFlag === 1) {
+        return res.json({ plan: null, valveOpen: true, valveReason: (vSource === 'manual') ? 'manual_override' : 'balance_ok', manualOverride: vSource === 'manual', availableBalance: Number(availBal.toFixed(2)) });
+      } else {
+        return res.json({ plan: null, valveOpen: false, valveReason: (vSource === 'manual') ? 'manual_close' : 'no_balance', manualOverride: vSource === 'manual', availableBalance: Number(availBal.toFixed(2)) });
+      }
+    } // end no-plan
+
+    // ---------- PLAN exists (active) ----------
+    // Use planAllowsOpen with balance as used in valve_states
+    let planInfo;
+    try {
+      planInfo = await planAllowsOpen(plan.user_id || plan.id /* not used for planAllowsOpen but fine */, availBal);
+      // Note: planAllowsOpen uses userId, we already passed correct info earlier in valve_states.
+    } catch (e) {
+      console.error('[device/state] planAllowsOpen error', e);
+      planInfo = { hasPlan: true, allowsOpen: false, reason: 'plan_check_error' };
     }
 
-    // 6) compute consumption and times
-    // If start_volume is null/undefined, treat it as 0? (we prefer treating as currVol so pre-plan flow doesn't count)
-    const startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
-                       ? parseFloat(plan.start_volume || 0)
-                       : currVol;
+    // Read latest meter
+    const [[meterRow]] = await pool.execute(`SELECT volume FROM sensor_data WHERE user_id=? ORDER BY timestamp DESC LIMIT 1`, [userId]);
+    const currVol = parseFloat(meterRow?.volume || 0);
 
-    const dayDate = todayString();
+    // Reset start_volume once per day (if needed)
+    try {
+      const [resetResult] = await pool.execute(
+        `UPDATE user_plans
+            SET last_reset_date = CURDATE(), start_volume = ?
+          WHERE id = ? AND (last_reset_date IS NULL OR last_reset_date < CURDATE())`,
+        [currVol, plan.id]
+      );
+      if (resetResult && resetResult.affectedRows > 0) {
+        plan.start_volume = currVol;
+      }
+    } catch (e) {
+      console.error('[device/state] reset update failed', e);
+    }
+
+    // consumedToday via ledger preferred
     let consumedToday = 0;
     try {
-      consumedToday = plan ? await getConsumedTodayForPlan(plan.id, dayDate) : 0;
+      consumedToday = await getConsumedTodayForPlan(plan.id, today);
       if (!Number.isFinite(consumedToday)) consumedToday = 0;
-    } catch (errGet) {
-      console.error('Failed to read consumedToday from user_plan_days:', errGet);
-      // fallback to legacy calc (best-effort)
-      consumedToday = currVol - startVol;
-      if (consumedToday < 0) consumedToday = 0;
+    } catch (e) {
+      const startVol = (plan.start_volume !== null && typeof plan.start_volume !== 'undefined')
+                         ? parseFloat(plan.start_volume || 0)
+                         : currVol;
+      consumedToday = Math.max(0, currVol - startVol);
     }
 
-    const perDayTarget = Number(parseFloat(plan.per_day_target) || 0);
+    const perDayTarget = Number(parseFloat(plan.per_day_target || 0));
+    const durationDays = parseInt(plan.duration_days || 0, 10) || 0;
+    const startMs = plan.start_datetime ? new Date(plan.start_datetime).getTime() : Date.now();
+    const daysElapsed = Math.max(0, Math.floor((Date.now() - startMs) / (1000 * 60 * 60 * 24)));
+    const daysLeft = (durationDays > 0) ? Math.max(0, durationDays - daysElapsed) : null;
     const remainingToday = Math.max(0, perDayTarget - consumedToday);
 
-    // days elapsed & left
-    const nowMs   = Date.now();
-    const startMs = plan.start_datetime ? new Date(plan.start_datetime).getTime() : nowMs;
-    const daysElapsed = Math.max(0, Math.floor((nowMs - startMs) / (1000 * 60 * 60 * 24)));
-    const durationDays = parseInt(plan.duration_days, 10) || 0;
-    const daysLeft = Math.max(0, durationDays - daysElapsed);
-
-    // end date
-    const startDate = plan.start_datetime ? new Date(plan.start_datetime) : new Date();
-    const endDate = new Date(startDate.getTime() + durationDays * 24 * 60 * 60 * 1000);
-    const endDateStr = endDate.toISOString().slice(0,10);
-
-    // 7) decide valve open + reason
-    const hitTodayLimit = perDayTarget > 0 && consumedToday >= perDayTarget;
-    const exceedDays    = durationDays > 0 && daysElapsed >= durationDays;
+    // If plan just finished due to duration -> planAllowsOpen already marked plan_completed & persisted plan_locked
+    // If daily limit hit -> planAllowsOpen already persisted 'daily_limit' and we should return valveOpen false for now
+    // Determine final valveOpen/valveReason respecting plan_locked (cannot be re-opened by system) and balance
+    // Re-read valve_state
+    const [[vsAfter]] = await pool.execute(`SELECT is_open, reason, source FROM valve_state WHERE user_id=? LIMIT 1`, [userId]);
+    const isOpenAfter = vsAfter ? vsAfter.is_open : null;
+    const vReasonAfter = vsAfter?.reason || null;
+    const manualOverride = !!(isOpenAfter === 1 && vsAfter?.source === 'manual');
 
     let valveOpen = false;
     let valveReason = 'ok';
 
-    if (availBal <= 0) {
+    if (vReasonAfter === 'plan_locked') {
       valveOpen = false;
-      valveReason = 'no_balance';
-    } else if (isOpenFlag === 0) {
+      valveReason = 'plan_locked';
+    } else if (vReasonAfter === 'daily_limit') {
       valveOpen = false;
-      valveReason = 'manual_close';
-    } else if (isOpenFlag === 1) {
-      valveOpen = true;
-      valveReason = 'manual_override';
+      valveReason = 'daily_limit';
     } else {
-      // auto
-      valveOpen = hitTodayLimit || exceedDays ? false : true;
-      valveReason = valveOpen ? 'plan_ok' : (exceedDays ? 'duration_complete' : 'daily_limit');
-      if (plan === null) {
+      // if planAllowsOpen allowed open and balance>0 => open; else closed
+      if (planInfo && planInfo.allowsOpen && availBal > 0) {
         valveOpen = true;
-        valveReason = 'balance_ok';
+        valveReason = 'plan_ok';
+      } else if (planInfo && planInfo.reason === 'no_balance') {
+        valveOpen = false;
+        valveReason = 'no_balance';
+      } else {
+        valveOpen = false;
+        valveReason = 'plan_blocked';
       }
     }
 
-    // 7b) If the system closed the valve (not manual) and there is a manual flag set in DB,
-    // clear it so the UI won't incorrectly keep showing "manual".
-    if (!valveOpen && manualOverride) {
-      try {
-        await pool.execute(
-          `UPDATE valve_state SET is_open = FALSE WHERE user_id = ?`,
-          [userId]
-        );
-        manualOverride = false; // reflect cleared flag in the response
-        console.log(`[device/state] cleared manual override for user ${userId} because system closed valve`);
-      } catch (clearErr) {
-        console.error('[device/state] failed to clear manual override flag:', clearErr);
-        // don't fail the whole request for this
-      }
-    }
+    // plan object to return
+    const planObj = {
+      planId: plan.id,
+      id: plan.id,
+      perDayTarget: Number(perDayTarget),
+      totalTarget: Number(parseFloat(plan.total_target_liters || 0)),
+      durationDays: durationDays,
+      daysElapsed: Number(daysElapsed),
+      daysLeft: daysLeft === null ? null : Number(daysLeft),
+      endDate: (plan.start_datetime && durationDays>0) ? new Date(new Date(plan.start_datetime).getTime() + durationDays*86400000).toISOString().slice(0,10) : '-',
+      consumedToday: Number(consumedToday.toFixed(2)),
+      remainingToday: Number(remainingToday.toFixed(2)),
+      startVolume: Number(plan.start_volume ?? 0),
+      startDatetime: plan.start_datetime ?? null,
+      status: planInfo && planInfo.reason === 'duration_complete' ? 'completed' : 'active'
+    };
 
-    // 8) auto-complete if fully done:
-    // - mark completed when duration completes OR when daily target is met (if not manually overridden)
-    if (exceedDays || (hitTodayLimit && !manualOverride)) {
-      try {
-        await pool.execute(
-          `UPDATE user_plans SET status='completed', completed_at = NOW() WHERE id = ? AND status = 'active'`,
-          [plan.id]
-        );
-        console.log(`[device/state] marked plan ${plan.id} completed for user ${userId} (exceedDays=${exceedDays}, hitTodayLimit=${hitTodayLimit}, manualOverride=${manualOverride})`);
-      } catch (updErr) {
-        console.error('[device/state] failed to mark plan completed:', updErr);
-      }
-    }
-
-    // 9) respond with numeric values and helpful metadata
     return res.json({
-      plan: {
-        planId:        plan.id,
-        perDayTarget:  Number(perDayTarget),
-        totalTarget:   Number(parseFloat(plan.total_target_liters) || 0),
-        durationDays:  durationDays,
-        daysElapsed,
-        daysLeft,
-        endDate:       endDateStr,
-        consumedToday: Number(Number(consumedToday).toFixed(2)),
-        remainingToday:Number(Number(remainingToday).toFixed(2)),
-        startVolume:   Number(parseFloat(plan.start_volume) || 0),
-        startDatetime: plan.start_datetime
-      },
-      valveOpen:        !!valveOpen,
+      plan: planObj,
+      valveOpen: !!valveOpen,
       valveReason,
-      manualOverride:   !!manualOverride,
+      manualOverride,
       availableBalance: Number(availBal.toFixed(2))
     });
 
@@ -1224,6 +1385,7 @@ app.get('/api/device/state', async (req, res) => {
     res.status(500).json({ error: 'Could not fetch device state.' });
   }
 });
+
 
 
 // Cancel plan route
